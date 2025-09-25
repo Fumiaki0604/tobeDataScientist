@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
+import { authOptions } from '../auth/[...nextauth]/route'
 
 // 簡易的なメモリストレージ（property APIと共通）
 const userProperties = new Map<string, string>()
@@ -22,7 +23,7 @@ interface AnalyticsAPIResponse {
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession() as ExtendedSession
+    const session = await getServerSession(authOptions) as ExtendedSession
 
     if (!session?.accessToken || !session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
