@@ -5,9 +5,16 @@ import { getServerSession } from 'next-auth/next'
 // 簡易的なメモリストレージ（property APIと共通）
 const userProperties = new Map<string, string>()
 
+interface ExtendedSession {
+  accessToken?: string
+  user?: {
+    email?: string
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession() as any
+    const session = await getServerSession() as ExtendedSession
 
     if (!session?.accessToken || !session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

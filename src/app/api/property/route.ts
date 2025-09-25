@@ -4,9 +4,15 @@ import { getServerSession } from 'next-auth/next'
 // 簡易的なメモリストレージ（本番環境ではデータベースを使用することを推奨）
 const userProperties = new Map<string, string>()
 
+interface ExtendedSession {
+  user?: {
+    email?: string
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession() as any
+    const session = await getServerSession() as ExtendedSession
 
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -34,7 +40,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   try {
-    const session = await getServerSession() as any
+    const session = await getServerSession() as ExtendedSession
 
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
