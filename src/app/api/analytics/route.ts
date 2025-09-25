@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { BetaAnalyticsDataClient } from '@google-analytics/data'
 import { getServerSession } from 'next-auth/next'
-import { OAuth2Client } from 'google-auth-library'
 
 // 簡易的なメモリストレージ（property APIと共通）
 const userProperties = new Map<string, string>()
@@ -34,17 +32,8 @@ export async function GET(request: NextRequest) {
     const metrics = searchParams.get('metrics') || 'activeUsers,sessions,pageviews'
     const dimensions = searchParams.get('dimensions') || 'date'
 
-    // OAuth2Clientを直接作成してアクセストークンを設定
-    const authClient = new OAuth2Client()
-    authClient.setCredentials({
-      access_token: session.accessToken
-    })
-
-    const analyticsDataClient = new BetaAnalyticsDataClient({
-      auth: authClient
-    })
-
-    const [response] = await analyticsDataClient.runReport({
+    // Google Analytics Data API REST APIを直接呼び出し
+    const requestBody = {
       property: `properties/${propertyId}`,
       dateRanges: [
         {
@@ -54,26 +43,41 @@ export async function GET(request: NextRequest) {
       ],
       dimensions: dimensions.split(',').map(dim => ({ name: dim.trim() })),
       metrics: metrics.split(',').map(metric => ({ name: metric.trim() })),
+    }
+
+    const response = await fetch(`https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${session.accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
     })
 
-    const formattedData = response.rows?.map(row => {
+    if (!response.ok) {
+      throw new Error(`API request failed: ${response.status} ${response.statusText}`)
+    }
+
+    const apiResult = await response.json()
+
+    const formattedData = apiResult.rows?.map((row: any) => {
       const data: Record<string, string | number> = {}
 
-      response.dimensionHeaders?.forEach((header, index) => {
-        data[header.name!] = row.dimensionValues?.[index]?.value
+      apiResult.dimensionHeaders?.forEach((header: any, index: number) => {
+        data[header.name] = row.dimensionValues?.[index]?.value
       })
 
-      response.metricHeaders?.forEach((header, index) => {
-        data[header.name!] = parseInt(row.metricValues?.[index]?.value || '0')
+      apiResult.metricHeaders?.forEach((header: any, index: number) => {
+        data[header.name] = parseInt(row.metricValues?.[index]?.value || '0')
       })
 
       return data
     })
 
     return NextResponse.json({
-      data: formattedData,
-      dimensionHeaders: response.dimensionHeaders,
-      metricHeaders: response.metricHeaders
+      data: formattedData || [],
+      dimensionHeaders: apiResult.dimensionHeaders,
+      metricHeaders: apiResult.metricHeaders
     })
 
   } catch (error) {
