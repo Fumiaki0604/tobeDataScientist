@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { BetaAnalyticsDataClient } from '@google-analytics/data'
-import { getServerSession } from 'next-auth'
+import { getServerSession } from 'next-auth/next'
 
 // 簡易的なメモリストレージ（property APIと共通）
 const userProperties = new Map<string, string>()

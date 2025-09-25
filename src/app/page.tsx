@@ -1,7 +1,7 @@
 'use client'
 
 import { useSession, signIn, signOut } from 'next-auth/react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { Users, Eye, MousePointer } from 'lucide-react'
 
@@ -67,7 +67,7 @@ export default function Dashboard() {
     }
   }
 
-  const fetchAnalyticsData = async () => {
+  const fetchAnalyticsData = useCallback(async () => {
     if (!session || !propertyId) return
 
     setLoading(true)
@@ -90,7 +90,7 @@ export default function Dashboard() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [session, propertyId, dateRange])
 
   useEffect(() => {
     if (session) {
@@ -102,7 +102,7 @@ export default function Dashboard() {
     if (session && propertyId) {
       fetchAnalyticsData()
     }
-  }, [session, propertyId, dateRange, fetchAnalyticsData])
+  }, [fetchAnalyticsData])
 
   if (status === 'loading') {
     return (

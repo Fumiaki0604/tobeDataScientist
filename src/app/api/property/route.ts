@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { getServerSession } from 'next-auth/next'
 
 // 簡易的なメモリストレージ（本番環境ではデータベースを使用することを推奨）
 const userProperties = new Map<string, string>()
