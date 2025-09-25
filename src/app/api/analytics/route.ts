@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
     })
 
     const formattedData = response.rows?.map(row => {
-      const data: any = {}
+      const data: Record<string, string | number> = {}
 
       response.dimensionHeaders?.forEach((header, index) => {
         data[header.name!] = row.dimensionValues?.[index]?.value

@@ -3,11 +3,18 @@
 import { useSession, signIn, signOut } from 'next-auth/react'
 import { useState, useEffect } from 'react'
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { Calendar, TrendingUp, Users, Eye, MousePointer } from 'lucide-react'
+import { Users, Eye, MousePointer } from 'lucide-react'
+
+interface AnalyticsDataItem {
+  date: string
+  activeUsers: number
+  sessions: number
+  pageviews: number
+}
 
 export default function Dashboard() {
   const { data: session, status } = useSession()
-  const [analyticsData, setAnalyticsData] = useState<any[]>([])
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsDataItem[]>([])
   const [loading, setLoading] = useState(false)
   const [dateRange, setDateRange] = useState('7daysAgo')
   const [error, setError] = useState('')
@@ -95,7 +102,7 @@ export default function Dashboard() {
     if (session && propertyId) {
       fetchAnalyticsData()
     }
-  }, [session, propertyId, dateRange])
+  }, [session, propertyId, dateRange, fetchAnalyticsData])
 
   if (status === 'loading') {
     return (
