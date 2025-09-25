@@ -56,6 +56,12 @@ export async function GET(request: NextRequest) {
       metrics: metrics.split(',').map(metric => ({ name: metric.trim() })),
     }
 
+    console.log('Analytics API Request:', {
+      url: `https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`,
+      requestBody,
+      hasAccessToken: !!session.accessToken
+    })
+
     const response = await fetch(`https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`, {
       method: 'POST',
       headers: {
@@ -65,8 +71,16 @@ export async function GET(request: NextRequest) {
       body: JSON.stringify(requestBody),
     })
 
+    console.log('Analytics API Response:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok
+    })
+
     if (!response.ok) {
-      throw new Error(`API request failed: ${response.status} ${response.statusText}`)
+      const errorText = await response.text()
+      console.error('API Error Response:', errorText)
+      throw new Error(`API request failed: ${response.status} ${response.statusText} - ${errorText}`)
     }
 
     const apiResult: AnalyticsAPIResponse = await response.json()

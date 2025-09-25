@@ -24,12 +24,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid property ID' }, { status: 400 })
     }
 
+    // GA4プロパティIDは数値のみである必要がある
+    const propertyIdTrimmed = propertyId.trim()
+    if (!/^\d+$/.test(propertyIdTrimmed)) {
+      return NextResponse.json({
+        error: 'Invalid property ID format. GA4 property ID should be numbers only (e.g., 123456789)'
+      }, { status: 400 })
+    }
+
     // プロパティIDを保存
-    userProperties.set(session.user.email, propertyId)
-    console.log(`プロパティID保存: ${session.user.email} -> ${propertyId}`)
+    userProperties.set(session.user.email, propertyIdTrimmed)
+    console.log(`プロパティID保存: ${session.user.email} -> ${propertyIdTrimmed}`)
     console.log('現在のストレージ:', Array.from(userProperties.entries()))
 
-    return NextResponse.json({ success: true, propertyId })
+    return NextResponse.json({ success: true, propertyId: propertyIdTrimmed })
 
   } catch (error) {
     console.error('Property API error:', error)
