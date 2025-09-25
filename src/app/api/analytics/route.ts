@@ -7,7 +7,7 @@ const userProperties = new Map<string, string>()
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession()
+    const session = await getServerSession() as any
 
     if (!session?.accessToken || !session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

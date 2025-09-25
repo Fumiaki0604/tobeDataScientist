@@ -102,7 +102,7 @@ export default function Dashboard() {
     if (session && propertyId) {
       fetchAnalyticsData()
     }
-  }, [fetchAnalyticsData])
+  }, [session, propertyId, fetchAnalyticsData])
 
   if (status === 'loading') {
     return (
