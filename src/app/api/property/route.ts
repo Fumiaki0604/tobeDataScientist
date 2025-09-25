@@ -9,6 +9,7 @@ interface ExtendedSession {
   user?: {
     email?: string
   }
+  [key: string]: any
 }
 
 export async function POST(request: NextRequest) {

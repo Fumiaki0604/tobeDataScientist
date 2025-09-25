@@ -10,6 +10,7 @@ interface ExtendedSession {
   user?: {
     email?: string
   }
+  [key: string]: any
 }
 
 interface AnalyticsAPIResponse {

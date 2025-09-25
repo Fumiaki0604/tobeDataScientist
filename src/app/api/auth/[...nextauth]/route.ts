@@ -1,21 +1,6 @@
 import NextAuth from 'next-auth/next'
 import GoogleProvider from 'next-auth/providers/google'
 
-interface Token {
-  accessToken?: string
-  [key: string]: unknown
-}
-
-interface Account {
-  access_token?: string
-  [key: string]: unknown
-}
-
-interface Session {
-  accessToken?: string
-  [key: string]: unknown
-}
-
 export const authOptions = {
   providers: [
     GoogleProvider({
@@ -29,13 +14,13 @@ export const authOptions = {
     })
   ],
   callbacks: {
-    async jwt({ token, account }: { token: Token, account: Account | null }) {
+    async jwt({ token, account }: any) {
       if (account) {
         token.accessToken = account.access_token
       }
       return token
     },
-    async session({ session, token }: { session: Session, token: Token }) {
+    async session({ session, token }: any) {
       session.accessToken = token.accessToken
       return session
     }
