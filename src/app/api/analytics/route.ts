@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const startDate = searchParams.get('startDate') || '7daysAgo'
     const endDate = searchParams.get('endDate') || 'today'
-    const metrics = searchParams.get('metrics') || 'activeUsers,sessions,pageviews'
+    const metrics = searchParams.get('metrics') || 'activeUsers,sessions,screenPageViews'
     const dimensions = searchParams.get('dimensions') || 'date'
 
     // Google Analytics Data API REST APIを直接呼び出し

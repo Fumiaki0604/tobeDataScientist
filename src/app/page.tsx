@@ -9,7 +9,7 @@ interface AnalyticsDataItem {
   date: string
   activeUsers: number
   sessions: number
-  pageviews: number
+  screenPageViews: number
 }
 
 export default function Dashboard() {
@@ -74,7 +74,7 @@ export default function Dashboard() {
     setError('')
 
     try {
-      const response = await fetch(`/api/analytics?startDate=${dateRange}&endDate=today&metrics=activeUsers,sessions,pageviews&dimensions=date`)
+      const response = await fetch(`/api/analytics?startDate=${dateRange}&endDate=today&metrics=activeUsers,sessions,screenPageViews&dimensions=date`)
 
       if (!response.ok) {
         if (response.status === 400) {
@@ -174,7 +174,7 @@ export default function Dashboard() {
 
   const totalUsers = analyticsData.reduce((sum, item) => sum + (item.activeUsers || 0), 0)
   const totalSessions = analyticsData.reduce((sum, item) => sum + (item.sessions || 0), 0)
-  const totalPageviews = analyticsData.reduce((sum, item) => sum + (item.pageviews || 0), 0)
+  const totalPageviews = analyticsData.reduce((sum, item) => sum + (item.screenPageViews || 0), 0)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -281,7 +281,7 @@ export default function Dashboard() {
                   <XAxis dataKey="date" />
                   <YAxis />
                   <Tooltip />
-                  <Bar dataKey="pageviews" fill="#8b5cf6" />
+                  <Bar dataKey="screenPageViews" fill="#8b5cf6" />
                 </BarChart>
               </ResponsiveContainer>
             )}
