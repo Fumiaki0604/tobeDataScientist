@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { BetaAnalyticsDataClient } from '@google-analytics/data'
 import { getServerSession } from 'next-auth/next'
+import { GoogleAuth } from 'google-auth-library'
 
 // 簡易的なメモリストレージ（property APIと共通）
 const userProperties = new Map<string, string>()
@@ -33,10 +34,19 @@ export async function GET(request: NextRequest) {
     const metrics = searchParams.get('metrics') || 'activeUsers,sessions,pageviews'
     const dimensions = searchParams.get('dimensions') || 'date'
 
+    // GoogleAuthを使用してOAuth2クライアントを作成
+    const auth = new GoogleAuth({
+      scopes: ['https://www.googleapis.com/auth/analytics.readonly']
+    })
+
+    const authClient = await auth.getClient()
+    // アクセストークンを設定
+    authClient.setCredentials({
+      access_token: session.accessToken
+    })
+
     const analyticsDataClient = new BetaAnalyticsDataClient({
-      credentials: {
-        access_token: session.accessToken
-      }
+      auth: authClient
     })
 
     const [response] = await analyticsDataClient.runReport({
