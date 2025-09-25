@@ -11,6 +11,15 @@ interface ExtendedSession {
   }
 }
 
+interface AnalyticsAPIResponse {
+  rows?: Array<{
+    dimensionValues?: Array<{ value: string }>
+    metricValues?: Array<{ value: string }>
+  }>
+  dimensionHeaders?: Array<{ name: string }>
+  metricHeaders?: Array<{ name: string }>
+}
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession() as ExtendedSession
@@ -58,16 +67,16 @@ export async function GET(request: NextRequest) {
       throw new Error(`API request failed: ${response.status} ${response.statusText}`)
     }
 
-    const apiResult = await response.json()
+    const apiResult: AnalyticsAPIResponse = await response.json()
 
-    const formattedData = apiResult.rows?.map((row: any) => {
+    const formattedData = apiResult.rows?.map((row) => {
       const data: Record<string, string | number> = {}
 
-      apiResult.dimensionHeaders?.forEach((header: any, index: number) => {
-        data[header.name] = row.dimensionValues?.[index]?.value
+      apiResult.dimensionHeaders?.forEach((header, index) => {
+        data[header.name] = row.dimensionValues?.[index]?.value || ''
       })
 
-      apiResult.metricHeaders?.forEach((header: any, index: number) => {
+      apiResult.metricHeaders?.forEach((header, index) => {
         data[header.name] = parseInt(row.metricValues?.[index]?.value || '0')
       })
 
