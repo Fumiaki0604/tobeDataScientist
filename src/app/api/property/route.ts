@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../auth/[...nextauth]/route'
-
-// 簡易的なメモリストレージ（本番環境ではデータベースを使用することを推奨）
-const userProperties = new Map<string, string>()
+import { userProperties } from '../../../lib/storage'
 
 interface ExtendedSession {
   user?: {
@@ -28,6 +26,8 @@ export async function POST(request: NextRequest) {
 
     // プロパティIDを保存
     userProperties.set(session.user.email, propertyId)
+    console.log(`プロパティID保存: ${session.user.email} -> ${propertyId}`)
+    console.log('現在のストレージ:', Array.from(userProperties.entries()))
 
     return NextResponse.json({ success: true, propertyId })
 
@@ -49,6 +49,8 @@ export async function GET() {
     }
 
     const propertyId = userProperties.get(session.user.email)
+    console.log(`プロパティID取得: ${session.user.email} -> ${propertyId}`)
+    console.log('現在のストレージ:', Array.from(userProperties.entries()))
 
     return NextResponse.json({ propertyId: propertyId || null })
 

@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../auth/[...nextauth]/route'
-
-// 簡易的なメモリストレージ（property APIと共通）
-const userProperties = new Map<string, string>()
+import { userProperties } from '../../../lib/storage'
 
 interface ExtendedSession {
   accessToken?: string
@@ -32,6 +30,8 @@ export async function GET(request: NextRequest) {
 
     // ユーザーのプロパティIDを取得
     const propertyId = userProperties.get(session.user.email)
+    console.log(`Analytics API - プロパティID取得: ${session.user.email} -> ${propertyId}`)
+    console.log('Analytics API - 現在のストレージ:', Array.from(userProperties.entries()))
 
     if (!propertyId) {
       return NextResponse.json({ error: 'Property ID not set' }, { status: 400 })
