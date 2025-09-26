@@ -82,6 +82,38 @@ const calculateDateRange = (timeframe: string) => {
   const yesterday = new Date(today)
   yesterday.setDate(yesterday.getDate() - 1)
 
+  // 特定月名への対応
+  const monthNames = {
+    '1月': 0, '2月': 1, '3月': 2, '4月': 3, '5月': 4, '6月': 5,
+    '7月': 6, '8月': 7, '9月': 8, '10月': 9, '11月': 10, '12月': 11,
+    'january': 0, 'february': 1, 'march': 2, 'april': 3, 'may': 4, 'june': 5,
+    'july': 6, 'august': 7, 'september': 8, 'october': 9, 'november': 10, 'december': 11
+  }
+
+  // 特定月の処理
+  const lowerTimeframe = timeframe.toLowerCase()
+  for (const [monthName, monthIndex] of Object.entries(monthNames)) {
+    if (lowerTimeframe.includes(monthName.toLowerCase())) {
+      const currentMonth = today.getMonth()
+      const currentYear = today.getFullYear()
+
+      // 指定月が今年のものか判断
+      let targetYear = currentYear
+      if (monthIndex > currentMonth) {
+        // 来年の月の場合は前年を対象とする
+        targetYear = currentYear - 1
+      }
+
+      const monthStart = new Date(targetYear, monthIndex, 1)
+      const monthEnd = new Date(targetYear, monthIndex + 1, 0)
+
+      return {
+        startDate: monthStart.toISOString().split('T')[0],
+        endDate: monthEnd.toISOString().split('T')[0]
+      }
+    }
+  }
+
   switch (timeframe) {
     case 'today':
       return {
@@ -167,8 +199,8 @@ const analyticsTools = [
         properties: {
           timeframe: {
             type: 'string',
-            enum: ['today', 'yesterday', 'last_7_days', 'last_week', 'this_week', 'last_30_days', 'this_month', 'last_month'],
-            description: '取得するデータの時期（例：先週=last_week、今週=this_week、過去7日=last_7_days、9月=last_month、先月=last_month）'
+            enum: ['today', 'yesterday', 'last_7_days', 'last_week', 'this_week', 'last_30_days', 'this_month', 'last_month', '1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
+            description: '取得するデータの時期（例：先週=last_week、今週=this_week、過去7日=last_7_days、現在の月=this_month、前月=last_month、特定月=9月、8月など）'
           },
           metrics: {
             type: 'array',
@@ -250,13 +282,15 @@ export async function POST(request: NextRequest) {
     const systemPrompt = `あなたはGoogle Analytics 4の専門分析者です。
 ユーザーからの質問に対して、適切なGA4データを取得するために必要なパラメータを決定してください。
 
+現在の日付: ${new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
+
 質問の例とパラメータ例：
 - "先週のユーザー数は?" → timeframe: "last_week", metrics: ["activeUsers"]
 - "今月のページビューの推移は?" → timeframe: "this_month", metrics: ["screenPageViews"], dimensions: ["date"]
 - "昨日と今日のセッション数を比較" → timeframe: "last_7_days", metrics: ["sessions"], dimensions: ["date"]
 - "過去30日間の傾向を教えて" → timeframe: "last_30_days", metrics: ["activeUsers", "sessions", "screenPageViews"], dimensions: ["date"]
 - "スマートフォンとデスクトップの売上を比較" → timeframe: "last_month", metrics: ["totalRevenue", "activeUsers"], dimensions: ["deviceCategory"]
-- "9月のデバイス別売上は?" → timeframe: "last_month", metrics: ["totalRevenue", "transactions"], dimensions: ["deviceCategory", "date"]
+- "9月のデバイス別売上は?" → timeframe: "9月", metrics: ["totalRevenue", "transactions"], dimensions: ["deviceCategory", "date"]
 - "先週の売上とトランザクション数は?" → timeframe: "last_week", metrics: ["totalRevenue", "transactions"]
 
 重要なポイント：
@@ -264,6 +298,7 @@ export async function POST(request: NextRequest) {
 - デバイス別分析には "deviceCategory" ディメンションを含める
 - トランザクション分析には "transactions" メトリクスを含める
 - 比較や推移を求められた場合は適切なディメンション（date, deviceCategory等）を追加する
+- 特定月の指定は月名で直接指定する（例：「9月」→ timeframe: "9月"、「8月」→ timeframe: "8月"）
 
 必ず get_analytics_data 関数を使って、質問に答えるために最適なデータを取得してください。`
 
