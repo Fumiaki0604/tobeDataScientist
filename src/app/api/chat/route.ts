@@ -17,6 +17,9 @@ interface OpenAIResponse {
 }
 
 const callOpenAI = async (messages: OpenAIMessage[]): Promise<string> => {
+  console.log('OpenAI API Call - API Key exists:', !!process.env.OPENAI_API_KEY)
+  console.log('OpenAI API Call - API Key prefix:', process.env.OPENAI_API_KEY?.substring(0, 10))
+
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -31,8 +34,12 @@ const callOpenAI = async (messages: OpenAIMessage[]): Promise<string> => {
     }),
   })
 
+  console.log('OpenAI API Response:', response.status, response.statusText)
+
   if (!response.ok) {
-    throw new Error(`OpenAI API error: ${response.statusText}`)
+    const errorText = await response.text()
+    console.error('OpenAI API Error Details:', errorText)
+    throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`)
   }
 
   const data: OpenAIResponse = await response.json()
@@ -76,7 +83,7 @@ const parseDateFromQuestion = (question: string) => {
   return dateRanges
 }
 
-// Analytics APIからデータを取得
+// Analytics APIから直接データを取得
 const fetchAnalyticsData = async (
   propertyId: string,
   accessToken: string,
@@ -85,15 +92,26 @@ const fetchAnalyticsData = async (
   metrics: string[] = ['activeUsers', 'sessions', 'screenPageViews'],
   dimensions: string[] = ['date']
 ) => {
-  // 既存のanalyticsAPIを使用する方法に変更
-  const response = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/analytics?startDate=${startDate}&endDate=${endDate}&metrics=${metrics.join(',')}&dimensions=${dimensions.join(',')}&propertyId=${propertyId}`, {
+  // Google Analytics Data APIを直接呼び出し
+  const requestBody = {
+    property: `properties/${propertyId}`,
+    dateRanges: [{ startDate, endDate }],
+    dimensions: dimensions.map(name => ({ name })),
+    metrics: metrics.map(name => ({ name })),
+  }
+
+  const response = await fetch(`https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`, {
+    method: 'POST',
     headers: {
       'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
     },
+    body: JSON.stringify(requestBody),
   })
 
   if (!response.ok) {
-    throw new Error('Analytics API call failed')
+    const errorText = await response.text()
+    throw new Error(`Analytics API error: ${response.status} ${errorText}`)
   }
 
   const result = await response.json()
