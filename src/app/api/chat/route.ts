@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../auth/[...nextauth]/route'
-import { BetaAnalyticsDataClient } from '@google-analytics/data'
-import { google } from 'googleapis'
 
 // OpenAIクライアントの設定
 interface OpenAIMessage {
@@ -87,21 +85,19 @@ const fetchAnalyticsData = async (
   metrics: string[] = ['activeUsers', 'sessions', 'screenPageViews'],
   dimensions: string[] = ['date']
 ) => {
-  const oauth2Client = new google.auth.OAuth2()
-  oauth2Client.setCredentials({ access_token: accessToken })
-
-  const analyticsDataClient = new BetaAnalyticsDataClient({
-    auth: oauth2Client,
+  // 既存のanalyticsAPIを使用する方法に変更
+  const response = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/analytics?startDate=${startDate}&endDate=${endDate}&metrics=${metrics.join(',')}&dimensions=${dimensions.join(',')}`, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+    },
   })
 
-  const [response] = await analyticsDataClient.runReport({
-    property: `properties/${propertyId}`,
-    dateRanges: [{ startDate, endDate }],
-    metrics: metrics.map(name => ({ name })),
-    dimensions: dimensions.map(name => ({ name })),
-  })
+  if (!response.ok) {
+    throw new Error('Analytics API call failed')
+  }
 
-  return response
+  const result = await response.json()
+  return result
 }
 
 export async function POST(request: NextRequest) {

@@ -25,7 +25,7 @@ export default function PropertySelector({ onPropertySelected, selectedPropertyI
 
   useEffect(() => {
     fetchProperties()
-  }, [])
+  }, []) // fetchPropertiesは内部関数なので依存関係から除外
 
   useEffect(() => {
     if (selectedPropertyId && properties.length > 0) {

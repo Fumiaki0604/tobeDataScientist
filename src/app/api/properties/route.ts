@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../auth/[...nextauth]/route'
 import { google } from 'googleapis'
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const session = await getServerSession(authOptions)
 
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
               allProperties.push({
                 id: propertyId,
                 name: property.displayName,
-                websiteUrl: property.websiteUrl || '',
+                websiteUrl: (property as any).websiteUrl || '',
                 accountName: account.displayName || '',
                 propertyType: property.propertyType || 'PROPERTY_TYPE_ORDINARY',
               })
