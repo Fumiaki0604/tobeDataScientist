@@ -49,31 +49,47 @@ const callOpenAI = async (
     }
   }
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(requestBody),
-  })
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 30000) // 30秒タイムアウト
 
-  console.log('OpenAI API Response:', response.status, response.statusText)
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+      signal: controller.signal
+    })
 
-  if (!response.ok) {
-    const errorText = await response.text()
-    console.error('OpenAI API Error Details:', errorText)
-    throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`)
+    clearTimeout(timeout)
+
+    console.log('OpenAI API Response:', response.status, response.statusText)
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('OpenAI API Error Details:', errorText)
+      throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`)
+    }
+
+    const data: OpenAIResponse = await response.json()
+    const message = data.choices[0]?.message
+
+    if (message?.tool_calls && message.tool_calls.length > 0) {
+      return { toolCalls: message.tool_calls }
+    }
+
+    return { content: message?.content || '回答を生成できませんでした。' }
+
+  } catch (error) {
+    clearTimeout(timeout)
+    if (error.name === 'AbortError') {
+      console.error('OpenAI API Timeout after 30 seconds')
+      throw new Error('リクエストがタイムアウトしました。もう一度お試しください。')
+    }
+    throw error
   }
-
-  const data: OpenAIResponse = await response.json()
-  const message = data.choices[0]?.message
-
-  if (message?.tool_calls && message.tool_calls.length > 0) {
-    return { toolCalls: message.tool_calls }
-  }
-
-  return { content: message?.content || '回答を生成できませんでした。' }
 }
 
 // 動的な日付計算関数
@@ -288,6 +304,7 @@ export async function POST(request: NextRequest) {
 - "先週のユーザー数は?" → timeframe: "last_week", metrics: ["activeUsers"]
 - "今月のページビューの推移は?" → timeframe: "this_month", metrics: ["screenPageViews"], dimensions: ["date"]
 - "昨日と今日のセッション数を比較" → timeframe: "last_7_days", metrics: ["sessions"], dimensions: ["date"]
+- "先週と今週のPV数を比較" → timeframe: "last_7_days", metrics: ["screenPageViews"], dimensions: ["date", "deviceCategory"]
 - "過去30日間の傾向を教えて" → timeframe: "last_30_days", metrics: ["activeUsers", "sessions", "screenPageViews"], dimensions: ["date"]
 - "スマートフォンとデスクトップの売上を比較" → timeframe: "last_month", metrics: ["totalRevenue", "activeUsers"], dimensions: ["deviceCategory"]
 - "9月のデバイス別売上は?" → timeframe: "9月", metrics: ["totalRevenue", "transactions"], dimensions: ["deviceCategory", "date"]
@@ -299,6 +316,7 @@ export async function POST(request: NextRequest) {
 - トランザクション分析には "transactions" メトリクスを含める
 - 比較や推移を求められた場合は適切なディメンション（date, deviceCategory等）を追加する
 - 特定月の指定は月名で直接指定する（例：「9月」→ timeframe: "9月"、「8月」→ timeframe: "8月"）
+- 期間比較（先週vs今週等）では包括的な期間（last_7_daysなど）と日付ディメンションで全データを取得する
 
 必ず get_analytics_data 関数を使って、質問に答えるために最適なデータを取得してください。`
 
