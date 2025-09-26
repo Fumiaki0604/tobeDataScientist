@@ -18,13 +18,36 @@ interface PropertySelectorProps {
 
 export default function PropertySelector({ onPropertySelected, selectedPropertyId }: PropertySelectorProps) {
   const [properties, setProperties] = useState<Property[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false) // 初期ロード状態をfalseに変更
   const [error, setError] = useState('')
   const [isOpen, setIsOpen] = useState(false)
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null)
+  const [isUpdating, setIsUpdating] = useState(false) // バックグラウンド更新用
 
   useEffect(() => {
-    fetchProperties()
+    // ローカルストレージからキャッシュされたプロパティを読み込み
+    const cachedProperties = localStorage.getItem('ga4-properties-cache')
+    if (cachedProperties) {
+      try {
+        const parsed = JSON.parse(cachedProperties)
+        setProperties(parsed)
+
+        // 既に保存されているプロパティIDがあるかチェック
+        const savedPropertyId = localStorage.getItem('ga4-property-id')
+        if (savedPropertyId) {
+          const savedProperty = parsed.find((p: Property) => p.id === savedPropertyId)
+          if (savedProperty) {
+            setSelectedProperty(savedProperty)
+            onPropertySelected(savedPropertyId)
+          }
+        }
+      } catch (e) {
+        console.error('Failed to parse cached properties:', e)
+      }
+    }
+
+    // バックグラウンドでプロパティ一覧を更新
+    fetchProperties(true)
   }, []) // fetchPropertiesは内部関数なので依存関係から除外
 
   useEffect(() => {
@@ -36,9 +59,15 @@ export default function PropertySelector({ onPropertySelected, selectedPropertyI
     }
   }, [selectedPropertyId, properties])
 
-  const fetchProperties = async () => {
+  const fetchProperties = async (isBackgroundUpdate = false) => {
     try {
-      setLoading(true)
+      // バックグラウンド更新の場合はisUpdatingを使用
+      if (isBackgroundUpdate) {
+        setIsUpdating(true)
+      } else {
+        setLoading(true)
+      }
+
       const response = await fetch('/api/properties')
 
       if (!response.ok) {
@@ -50,22 +79,37 @@ export default function PropertySelector({ onPropertySelected, selectedPropertyI
       if (result.success) {
         setProperties(result.properties)
 
-        // 既に保存されているプロパティIDがあるかチェック
-        const savedPropertyId = localStorage.getItem('ga4-property-id')
-        if (savedPropertyId) {
-          const savedProperty = result.properties.find((p: Property) => p.id === savedPropertyId)
-          if (savedProperty) {
-            setSelectedProperty(savedProperty)
-            onPropertySelected(savedPropertyId)
+        // プロパティ一覧をローカルストレージにキャッシュ
+        localStorage.setItem('ga4-properties-cache', JSON.stringify(result.properties))
+
+        // 既に保存されているプロパティIDがあるかチェック（初回ロード時のみ）
+        if (!isBackgroundUpdate) {
+          const savedPropertyId = localStorage.getItem('ga4-property-id')
+          if (savedPropertyId) {
+            const savedProperty = result.properties.find((p: Property) => p.id === savedPropertyId)
+            if (savedProperty) {
+              setSelectedProperty(savedProperty)
+              onPropertySelected(savedPropertyId)
+            }
           }
         }
+
+        // エラーをクリア
+        setError('')
       } else {
         throw new Error(result.error || 'プロパティの取得に失敗しました')
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'エラーが発生しました')
+      // バックグラウンド更新でエラーが発生した場合は、エラー表示はしない
+      if (!isBackgroundUpdate) {
+        setError(err instanceof Error ? err.message : 'エラーが発生しました')
+      }
     } finally {
-      setLoading(false)
+      if (isBackgroundUpdate) {
+        setIsUpdating(false)
+      } else {
+        setLoading(false)
+      }
     }
   }
 
@@ -104,7 +148,7 @@ export default function PropertySelector({ onPropertySelected, selectedPropertyI
 
           <div className="space-y-3">
             <button
-              onClick={fetchProperties}
+              onClick={() => fetchProperties(false)}
               className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
             >
               再試行
@@ -161,7 +205,7 @@ export default function PropertySelector({ onPropertySelected, selectedPropertyI
             Google Analyticsでプロパティが正しく設定されているか確認してください。
           </p>
           <button
-            onClick={fetchProperties}
+            onClick={() => fetchProperties(false)}
             className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
           >
             再読み込み

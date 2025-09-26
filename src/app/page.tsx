@@ -12,6 +12,8 @@ interface AnalyticsDataItem {
   activeUsers: number
   sessions: number
   screenPageViews: number
+  transactions: number
+  totalRevenue: number
 }
 
 export default function Dashboard() {
@@ -45,7 +47,7 @@ export default function Dashboard() {
     setError('')
 
     try {
-      const response = await fetch(`/api/analytics?startDate=${dateRange}&endDate=today&metrics=activeUsers,sessions,screenPageViews&dimensions=date&propertyId=${propertyId}`)
+      const response = await fetch(`/api/analytics?startDate=${dateRange}&endDate=today&metrics=activeUsers,sessions,screenPageViews,transactions,totalRevenue&dimensions=date&propertyId=${propertyId}`)
 
       if (!response.ok) {
         if (response.status === 400) {
@@ -113,6 +115,8 @@ export default function Dashboard() {
   const totalUsers = analyticsData.reduce((sum, item) => sum + (item.activeUsers || 0), 0)
   const totalSessions = analyticsData.reduce((sum, item) => sum + (item.sessions || 0), 0)
   const totalPageviews = analyticsData.reduce((sum, item) => sum + (item.screenPageViews || 0), 0)
+  const totalTransactions = analyticsData.reduce((sum, item) => sum + (item.transactions || 0), 0)
+  const totalRevenue = analyticsData.reduce((sum, item) => sum + (item.totalRevenue || 0), 0)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -204,7 +208,7 @@ export default function Dashboard() {
               </select>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6 mb-8">
               <div className="bg-white p-6 rounded-lg shadow-sm border">
                 <div className="flex items-center">
                   <Users className="h-8 w-8 text-blue-600" />
@@ -231,6 +235,28 @@ export default function Dashboard() {
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-600">ページビュー</p>
                     <p className="text-2xl font-semibold text-gray-900">{totalPageviews.toLocaleString()}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white p-6 rounded-lg shadow-sm border">
+                <div className="flex items-center">
+                  <BarChart3 className="h-8 w-8 text-orange-600" />
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-600">トランザクション</p>
+                    <p className="text-2xl font-semibold text-gray-900">{totalTransactions.toLocaleString()}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white p-6 rounded-lg shadow-sm border">
+                <div className="flex items-center">
+                  <div className="h-8 w-8 text-red-600 flex items-center justify-center">
+                    <span className="text-lg font-bold">¥</span>
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-600">売上</p>
+                    <p className="text-2xl font-semibold text-gray-900">¥{totalRevenue.toLocaleString()}</p>
                   </div>
                 </div>
               </div>
