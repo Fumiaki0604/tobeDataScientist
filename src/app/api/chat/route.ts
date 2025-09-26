@@ -238,6 +238,28 @@ const analyticsTools = [
         required: ['timeframe', 'metrics']
       }
     }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'compare_analytics_data',
+      description: '前回取得したデータと新しいデータを比較分析します。段階的な比較分析に使用してください。',
+      parameters: {
+        type: 'object',
+        properties: {
+          analysis_type: {
+            type: 'string',
+            enum: ['period_comparison', 'device_comparison', 'trend_analysis'],
+            description: '比較分析の種類（期間比較、デバイス比較、トレンド分析）'
+          },
+          comparison_note: {
+            type: 'string',
+            description: '比較に関するメモや説明'
+          }
+        },
+        required: ['analysis_type']
+      }
+    }
   }
 ]
 
@@ -304,7 +326,7 @@ export async function POST(request: NextRequest) {
 - "先週のユーザー数は?" → timeframe: "last_week", metrics: ["activeUsers"]
 - "今月のページビューの推移は?" → timeframe: "this_month", metrics: ["screenPageViews"], dimensions: ["date"]
 - "昨日と今日のセッション数を比較" → timeframe: "last_7_days", metrics: ["sessions"], dimensions: ["date"]
-- "先週と今週のPV数を比較" → timeframe: "last_7_days", metrics: ["screenPageViews"], dimensions: ["date", "deviceCategory"]
+- "先週と今週のPV数を比較" → 段階的分析: まずlast_week取得、次にthis_week取得、最後にcompare_analytics_data
 - "過去30日間の傾向を教えて" → timeframe: "last_30_days", metrics: ["activeUsers", "sessions", "screenPageViews"], dimensions: ["date"]
 - "スマートフォンとデスクトップの売上を比較" → timeframe: "last_month", metrics: ["totalRevenue", "activeUsers"], dimensions: ["deviceCategory"]
 - "9月のデバイス別売上は?" → timeframe: "9月", metrics: ["totalRevenue", "transactions"], dimensions: ["deviceCategory", "date"]
@@ -316,9 +338,10 @@ export async function POST(request: NextRequest) {
 - トランザクション分析には "transactions" メトリクスを含める
 - 比較や推移を求められた場合は適切なディメンション（date, deviceCategory等）を追加する
 - 特定月の指定は月名で直接指定する（例：「9月」→ timeframe: "9月"、「8月」→ timeframe: "8月"）
-- 期間比較（先週vs今週等）では包括的な期間（last_7_daysなど）と日付ディメンションで全データを取得する
+- 期間比較（先週vs今週等）では段階的分析を活用する：1回目で先週、2回目で今週、3回目で比較分析
+- 複雑な比較質問では、複数回のget_analytics_data呼び出しとcompare_analytics_data使用を検討する
 
-必ず get_analytics_data 関数を使って、質問に答えるために最適なデータを取得してください。`
+必ず適切なツール（get_analytics_data, compare_analytics_data）を使って、段階的に質問に答えてください。`
 
     const initialMessages: OpenAIMessage[] = [
       { role: 'system', content: systemPrompt },
@@ -340,32 +363,105 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Step 3: AIが決定したパラメータでGA4データを取得
-    const toolCall = toolResponse.toolCalls[0]
-    const functionArgs = JSON.parse(toolCall.function.arguments)
-    console.log('📊 AI determined parameters:', functionArgs)
+    // Step 3: 複数ツール呼び出し対応の段階的分析
+    let analysisHistory: any[] = []
+    let conversationHistory = [...initialMessages]
+    let currentToolResponse = toolResponse
 
-    const { timeframe, metrics = ['activeUsers', 'sessions', 'screenPageViews'], dimensions = ['date'] } = functionArgs
+    // 最大3回の分析ステップまで対応
+    for (let step = 0; step < 3 && currentToolResponse.toolCalls && currentToolResponse.toolCalls.length > 0; step++) {
+      const toolCall = currentToolResponse.toolCalls[0]
+      console.log(`📊 Step ${step + 1}: ${toolCall.function.name}`)
 
-    // 日付範囲を計算
-    const { startDate, endDate } = calculateDateRange(timeframe)
-    console.log('📅 Date range:', { timeframe, startDate, endDate })
+      if (toolCall.function.name === 'get_analytics_data') {
+        const functionArgs = JSON.parse(toolCall.function.arguments)
+        console.log('📊 AI determined parameters:', functionArgs)
 
-    // GA4データを取得
-    let analyticsData = null
-    try {
-      analyticsData = await fetchAnalyticsData(
-        propertyId,
-        session.accessToken,
-        startDate,
-        endDate,
-        metrics,
-        dimensions
-      )
-      console.log('✅ Analytics data fetched successfully')
-    } catch (analyticsError) {
-      console.error('❌ Analytics API エラー:', analyticsError)
+        const { timeframe, metrics = ['activeUsers', 'sessions', 'screenPageViews'], dimensions = ['date'] } = functionArgs
+
+        // 日付範囲を計算
+        const { startDate, endDate } = calculateDateRange(timeframe)
+        console.log('📅 Date range:', { timeframe, startDate, endDate })
+
+        // GA4データを取得
+        let analyticsData = null
+        try {
+          analyticsData = await fetchAnalyticsData(
+            propertyId,
+            session.accessToken,
+            startDate,
+            endDate,
+            metrics,
+            dimensions
+          )
+          console.log('✅ Analytics data fetched successfully')
+
+          // データを履歴に保存
+          analysisHistory.push({
+            step: step + 1,
+            timeframe,
+            startDate,
+            endDate,
+            metrics,
+            dimensions,
+            data: analyticsData
+          })
+
+          // 会話履歴にツール結果を追加
+          conversationHistory.push({
+            role: 'function',
+            name: 'get_analytics_data',
+            content: JSON.stringify({
+              timeframe,
+              startDate,
+              endDate,
+              metrics,
+              dimensions,
+              data: analyticsData
+            })
+          })
+
+        } catch (analyticsError) {
+          console.error('❌ Analytics API エラー:', analyticsError)
+          break
+        }
+
+      } else if (toolCall.function.name === 'compare_analytics_data') {
+        console.log('🔄 Performing comparison analysis...')
+
+        // 比較分析のツール結果を追加
+        conversationHistory.push({
+          role: 'function',
+          name: 'compare_analytics_data',
+          content: JSON.stringify({
+            analysis_type: JSON.parse(toolCall.function.arguments).analysis_type,
+            previous_data_available: analysisHistory.length > 0,
+            steps_completed: analysisHistory.length
+          })
+        })
+      }
+
+      // 次のツール呼び出しが必要かAIに判断させる
+      conversationHistory.push({
+        role: 'assistant',
+        content: `ステップ${step + 1}が完了しました。続けて分析が必要な場合は、適切なツールを呼び出してください。分析が完了した場合は、結果をまとめてください。`
+      })
+
+      try {
+        currentToolResponse = await callOpenAI(conversationHistory, analyticsTools, 'auto')
+        if (!currentToolResponse.toolCalls || currentToolResponse.toolCalls.length === 0) {
+          console.log('🏁 Analysis completed or no more tool calls needed')
+          break
+        }
+      } catch (error) {
+        console.error('❌ Error in follow-up tool analysis:', error)
+        break
+      }
     }
+
+    // 最終分析で使用するデータ（最新の分析結果）
+    const latestAnalysis = analysisHistory[analysisHistory.length - 1]
+    const analyticsData = latestAnalysis?.data || null
 
     // Step 4: 取得したデータでAIが最終回答を生成
     const analysisPrompt = `あなたはGoogle Analytics 4の専門分析者です。
@@ -385,22 +481,39 @@ export async function POST(request: NextRequest) {
 
 データが取得できた場合は、そのデータに基づいて詳細な分析を提供してください。`
 
+    // 分析履歴を含む完全なコンテキストを構築
     const analysisMessages: OpenAIMessage[] = [
       { role: 'system', content: analysisPrompt },
-      { role: 'user', content: question },
-      {
+      { role: 'user', content: question }
+    ]
+
+    // 全ての分析ステップの結果を追加
+    analysisHistory.forEach((analysis, index) => {
+      analysisMessages.push({
         role: 'function',
         name: 'get_analytics_data',
         content: JSON.stringify({
-          timeframe,
-          startDate,
-          endDate,
-          metrics,
-          dimensions,
+          step: analysis.step,
+          timeframe: analysis.timeframe,
+          startDate: analysis.startDate,
+          endDate: analysis.endDate,
+          metrics: analysis.metrics,
+          dimensions: analysis.dimensions,
+          data: analysis.data
+        })
+      })
+    })
+
+    // 分析履歴がない場合は従来通り
+    if (analysisHistory.length === 0 && analyticsData) {
+      analysisMessages.push({
+        role: 'function',
+        name: 'get_analytics_data',
+        content: JSON.stringify({
           data: analyticsData
         })
-      }
-    ]
+      })
+    }
 
     console.log('🧠 AI generating final analysis...')
     const finalResponse = await callOpenAI(analysisMessages)
