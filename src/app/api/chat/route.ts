@@ -17,13 +17,17 @@ interface OpenAIResponse {
 }
 
 const callOpenAI = async (messages: OpenAIMessage[]): Promise<string> => {
-  console.log('OpenAI API Call - API Key exists:', !!process.env.OPENAI_API_KEY)
-  console.log('OpenAI API Call - API Key prefix:', process.env.OPENAI_API_KEY?.substring(0, 10))
+  // 一時的にハードコードでAPIキーを設定
+  const apiKey = process.env.OPENAI_API_KEY || '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'
+
+  console.log('OpenAI API Call - API Key exists:', !!apiKey)
+  console.log('OpenAI API Call - API Key prefix:', apiKey.substring(0, 10))
+  console.log('OpenAI API Call - process.env.OPENAI_API_KEY exists:', !!process.env.OPENAI_API_KEY)
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+      'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
