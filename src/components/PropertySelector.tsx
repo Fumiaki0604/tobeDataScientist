@@ -92,14 +92,59 @@ export default function PropertySelector({ onPropertySelected, selectedPropertyI
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
         <div className="bg-white p-8 rounded-lg shadow-md text-center max-w-md">
-          <h1 className="text-2xl font-bold mb-4 text-red-600">エラー</h1>
-          <p className="text-gray-600 mb-6">{error}</p>
-          <button
-            onClick={fetchProperties}
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            再試行
-          </button>
+          <h1 className="text-2xl font-bold mb-4 text-red-600">プロパティ取得エラー</h1>
+          <p className="text-gray-600 mb-4">{error}</p>
+
+          {error.includes('Admin API') && (
+            <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded mb-4 text-sm">
+              <p className="font-semibold">API有効化が必要です：</p>
+              <p>Google Cloud ConsoleでAnalytics Admin APIを有効化してください</p>
+            </div>
+          )}
+
+          <div className="space-y-3">
+            <button
+              onClick={fetchProperties}
+              className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              再試行
+            </button>
+
+            <div className="border-t pt-4">
+              <p className="text-sm text-gray-600 mb-3">または手動でプロパティIDを入力：</p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="プロパティID (例: 123456789)"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm"
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      const value = (e.target as HTMLInputElement).value.trim()
+                      if (value) {
+                        localStorage.setItem('ga4-property-id', value)
+                        localStorage.setItem('ga4-property-name', `プロパティ ${value}`)
+                        onPropertySelected(value)
+                      }
+                    }
+                  }}
+                />
+                <button
+                  onClick={(e) => {
+                    const input = (e.target as HTMLButtonElement).parentElement?.querySelector('input')
+                    const value = input?.value.trim()
+                    if (value) {
+                      localStorage.setItem('ga4-property-id', value)
+                      localStorage.setItem('ga4-property-name', `プロパティ ${value}`)
+                      onPropertySelected(value)
+                    }
+                  }}
+                  className="px-4 py-2 bg-gray-600 text-white rounded text-sm hover:bg-gray-700"
+                >
+                  設定
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     )

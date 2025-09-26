@@ -28,20 +28,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // ユーザーのプロパティIDを取得
-    const propertyId = userProperties.get(session.user.email)
-    console.log(`Analytics API - プロパティID取得: ${session.user.email} -> ${propertyId}`)
-    console.log('Analytics API - 現在のストレージ:', Array.from(userProperties.entries()))
-
-    if (!propertyId) {
-      return NextResponse.json({ error: 'Property ID not set' }, { status: 400 })
-    }
-
     const { searchParams } = new URL(request.url)
     const startDate = searchParams.get('startDate') || '7daysAgo'
     const endDate = searchParams.get('endDate') || 'today'
     const metrics = searchParams.get('metrics') || 'activeUsers,sessions,screenPageViews'
     const dimensions = searchParams.get('dimensions') || 'date'
+
+    // プロパティIDをパラメータから取得（優先）、またはストレージから取得
+    let propertyId = searchParams.get('propertyId')
+
+    if (!propertyId) {
+      propertyId = userProperties.get(session.user.email) || null
+    }
+
+    console.log(`Analytics API - プロパティID: ${propertyId} (from: ${searchParams.get('propertyId') ? 'parameter' : 'storage'})`)
+
+    if (!propertyId) {
+      return NextResponse.json({ error: 'Property ID not set' }, { status: 400 })
+    }
 
     // Google Analytics Data API REST APIを直接呼び出し
     const requestBody = {

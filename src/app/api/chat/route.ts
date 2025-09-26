@@ -86,7 +86,7 @@ const fetchAnalyticsData = async (
   dimensions: string[] = ['date']
 ) => {
   // 既存のanalyticsAPIを使用する方法に変更
-  const response = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/analytics?startDate=${startDate}&endDate=${endDate}&metrics=${metrics.join(',')}&dimensions=${dimensions.join(',')}`, {
+  const response = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/analytics?startDate=${startDate}&endDate=${endDate}&metrics=${metrics.join(',')}&dimensions=${dimensions.join(',')}&propertyId=${propertyId}`, {
     headers: {
       'Authorization': `Bearer ${accessToken}`,
     },

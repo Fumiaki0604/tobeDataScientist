@@ -28,6 +28,16 @@ export default function Dashboard() {
     setError('')
   }
 
+  // ページロード時にlocalStorageからプロパティIDを取得
+  useEffect(() => {
+    if (session && !propertyId) {
+      const savedPropertyId = localStorage.getItem('ga4-property-id')
+      if (savedPropertyId) {
+        setPropertyId(savedPropertyId)
+      }
+    }
+  }, [session, propertyId])
+
   const fetchAnalyticsData = useCallback(async () => {
     if (!session || !propertyId) return
 
@@ -35,7 +45,7 @@ export default function Dashboard() {
     setError('')
 
     try {
-      const response = await fetch(`/api/analytics?startDate=${dateRange}&endDate=today&metrics=activeUsers,sessions,screenPageViews&dimensions=date`)
+      const response = await fetch(`/api/analytics?startDate=${dateRange}&endDate=today&metrics=activeUsers,sessions,screenPageViews&dimensions=date&propertyId=${propertyId}`)
 
       if (!response.ok) {
         if (response.status === 400) {
