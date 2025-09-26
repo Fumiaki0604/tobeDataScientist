@@ -168,15 +168,15 @@ const analyticsTools = [
           timeframe: {
             type: 'string',
             enum: ['today', 'yesterday', 'last_7_days', 'last_week', 'this_week', 'last_30_days', 'this_month', 'last_month'],
-            description: '取得するデータの時期（例：先週=last_week、今週=this_week、過去7日=last_7_days）'
+            description: '取得するデータの時期（例：先週=last_week、今週=this_week、過去7日=last_7_days、9月=last_month、先月=last_month）'
           },
           metrics: {
             type: 'array',
             items: {
               type: 'string',
-              enum: ['activeUsers', 'sessions', 'screenPageViews', 'bounceRate', 'sessionDuration']
+              enum: ['activeUsers', 'sessions', 'screenPageViews', 'bounceRate', 'sessionDuration', 'totalRevenue', 'transactions']
             },
-            description: '取得するメトリクス（例：ユーザー数=activeUsers、セッション数=sessions、ページビュー=screenPageViews）'
+            description: '取得するメトリクス（例：ユーザー数=activeUsers、セッション数=sessions、ページビュー=screenPageViews、売上=totalRevenue、トランザクション数=transactions）'
           },
           dimensions: {
             type: 'array',
@@ -255,6 +255,15 @@ export async function POST(request: NextRequest) {
 - "今月のページビューの推移は?" → timeframe: "this_month", metrics: ["screenPageViews"], dimensions: ["date"]
 - "昨日と今日のセッション数を比較" → timeframe: "last_7_days", metrics: ["sessions"], dimensions: ["date"]
 - "過去30日間の傾向を教えて" → timeframe: "last_30_days", metrics: ["activeUsers", "sessions", "screenPageViews"], dimensions: ["date"]
+- "スマートフォンとデスクトップの売上を比較" → timeframe: "last_month", metrics: ["totalRevenue", "activeUsers"], dimensions: ["deviceCategory"]
+- "9月のデバイス別売上は?" → timeframe: "last_month", metrics: ["totalRevenue", "transactions"], dimensions: ["deviceCategory", "date"]
+- "先週の売上とトランザクション数は?" → timeframe: "last_week", metrics: ["totalRevenue", "transactions"]
+
+重要なポイント：
+- 売上に関する質問には必ず "totalRevenue" メトリクスを含める
+- デバイス別分析には "deviceCategory" ディメンションを含める
+- トランザクション分析には "transactions" メトリクスを含める
+- 比較や推移を求められた場合は適切なディメンション（date, deviceCategory等）を追加する
 
 必ず get_analytics_data 関数を使って、質問に答えるために最適なデータを取得してください。`
 
@@ -309,8 +318,14 @@ export async function POST(request: NextRequest) {
     const analysisPrompt = `あなたはGoogle Analytics 4の専門分析者です。
 取得したデータを基に、ユーザーの質問に対して具体的で分かりやすい日本語の回答を提供してください。
 
+重要な注意事項：
+- ユーザーが「売上」について質問した場合は、必ずtotalRevenueデータを使用して回答してください
+- デバイス別分析では、deviceCategoryディメンションのデータを活用してください
+- 質問されていないメトリクス（activeUsers、sessionsなど）で回答を埋めることは避けてください
+- 具体的な数値が取得できない場合は、その旨を正直に伝えてください
+
 回答は以下の形式を心がけてください：
-1. 具体的な数値とデータ
+1. 具体的な数値とデータ（質問に直接関連するもの）
 2. トレンドや変化の分析
 3. 可能性のある原因や要因
 4. 改善提案やアクションアイテム
