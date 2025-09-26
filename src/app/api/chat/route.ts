@@ -4,25 +4,50 @@ import { authOptions } from '../auth/[...nextauth]/route'
 
 // OpenAIクライアントの設定
 interface OpenAIMessage {
-  role: 'system' | 'user' | 'assistant'
+  role: 'system' | 'user' | 'assistant' | 'function'
   content: string
+  name?: string
 }
 
 interface OpenAIResponse {
   choices: Array<{
     message: {
-      content: string
+      content?: string
+      tool_calls?: Array<{
+        id: string
+        type: string
+        function: {
+          name: string
+          arguments: string
+        }
+      }>
     }
   }>
 }
 
-const callOpenAI = async (messages: OpenAIMessage[]): Promise<string> => {
+const callOpenAI = async (
+  messages: OpenAIMessage[],
+  tools?: any[],
+  toolChoice?: string
+): Promise<{ content?: string; toolCalls?: any[] }> => {
   // 一時的にハードコードでAPIキーを設定
   const apiKey = process.env.OPENAI_API_KEY || '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'
 
   console.log('OpenAI API Call - API Key exists:', !!apiKey)
-  console.log('OpenAI API Call - API Key prefix:', apiKey.substring(0, 10))
-  console.log('OpenAI API Call - process.env.OPENAI_API_KEY exists:', !!process.env.OPENAI_API_KEY)
+
+  const requestBody: any = {
+    model: 'gpt-4o-mini',
+    messages,
+    temperature: 0.7,
+    max_tokens: 1000,
+  }
+
+  if (tools && tools.length > 0) {
+    requestBody.tools = tools
+    if (toolChoice) {
+      requestBody.tool_choice = toolChoice
+    }
+  }
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -30,12 +55,7 @@ const callOpenAI = async (messages: OpenAIMessage[]): Promise<string> => {
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      messages,
-      temperature: 0.7,
-      max_tokens: 1000,
-    }),
+    body: JSON.stringify(requestBody),
   })
 
   console.log('OpenAI API Response:', response.status, response.statusText)
@@ -47,45 +67,131 @@ const callOpenAI = async (messages: OpenAIMessage[]): Promise<string> => {
   }
 
   const data: OpenAIResponse = await response.json()
-  return data.choices[0]?.message?.content || '回答を生成できませんでした。'
+  const message = data.choices[0]?.message
+
+  if (message?.tool_calls && message.tool_calls.length > 0) {
+    return { toolCalls: message.tool_calls }
+  }
+
+  return { content: message?.content || '回答を生成できませんでした。' }
 }
 
-// 日付解析ヘルパー関数
-const parseDateFromQuestion = (question: string) => {
+// 動的な日付計算関数
+const calculateDateRange = (timeframe: string) => {
   const today = new Date()
   const yesterday = new Date(today)
   yesterday.setDate(yesterday.getDate() - 1)
 
-  const patterns = [
-    { pattern: /昨日|yesterday/i, days: 1 },
-    { pattern: /今日|today/i, days: 0 },
-    { pattern: /一昨日/i, days: 2 },
-    { pattern: /3日前/i, days: 3 },
-    { pattern: /1週間前|先週/i, days: 7 },
-    { pattern: /2週間前/i, days: 14 },
-    { pattern: /1ヶ月前|先月/i, days: 30 },
-  ]
+  switch (timeframe) {
+    case 'today':
+      return {
+        startDate: today.toISOString().split('T')[0],
+        endDate: today.toISOString().split('T')[0]
+      }
 
-  const dateRanges = []
+    case 'yesterday':
+      return {
+        startDate: yesterday.toISOString().split('T')[0],
+        endDate: yesterday.toISOString().split('T')[0]
+      }
 
-  for (const { pattern, days } of patterns) {
-    if (pattern.test(question)) {
-      const date = new Date(today)
-      date.setDate(date.getDate() - days)
-      dateRanges.push(date.toISOString().split('T')[0])
+    case 'last_7_days':
+      const sevenDaysAgo = new Date(today)
+      sevenDaysAgo.setDate(today.getDate() - 7)
+      return {
+        startDate: sevenDaysAgo.toISOString().split('T')[0],
+        endDate: today.toISOString().split('T')[0]
+      }
+
+    case 'last_week':
+      const lastWeekEnd = new Date(today)
+      lastWeekEnd.setDate(today.getDate() - today.getDay() - 1) // 先週の土曜日
+      const lastWeekStart = new Date(lastWeekEnd)
+      lastWeekStart.setDate(lastWeekEnd.getDate() - 6) // 先週の日曜日
+      return {
+        startDate: lastWeekStart.toISOString().split('T')[0],
+        endDate: lastWeekEnd.toISOString().split('T')[0]
+      }
+
+    case 'this_week':
+      const thisWeekStart = new Date(today)
+      thisWeekStart.setDate(today.getDate() - today.getDay()) // 今週の日曜日
+      return {
+        startDate: thisWeekStart.toISOString().split('T')[0],
+        endDate: today.toISOString().split('T')[0]
+      }
+
+    case 'last_30_days':
+      const thirtyDaysAgo = new Date(today)
+      thirtyDaysAgo.setDate(today.getDate() - 30)
+      return {
+        startDate: thirtyDaysAgo.toISOString().split('T')[0],
+        endDate: today.toISOString().split('T')[0]
+      }
+
+    case 'this_month':
+      const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1)
+      return {
+        startDate: thisMonthStart.toISOString().split('T')[0],
+        endDate: today.toISOString().split('T')[0]
+      }
+
+    case 'last_month':
+      const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1)
+      const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0)
+      return {
+        startDate: lastMonthStart.toISOString().split('T')[0],
+        endDate: lastMonthEnd.toISOString().split('T')[0]
+      }
+
+    default:
+      // デフォルトは過去7日間
+      const defaultStart = new Date(today)
+      defaultStart.setDate(today.getDate() - 7)
+      return {
+        startDate: defaultStart.toISOString().split('T')[0],
+        endDate: today.toISOString().split('T')[0]
+      }
+  }
+}
+
+// GA4データ取得用のツール定義
+const analyticsTools = [
+  {
+    type: 'function',
+    function: {
+      name: 'get_analytics_data',
+      description: 'Google Analytics 4からデータを取得します。質問に応じて適切な時期とメトリクスを指定してください。',
+      parameters: {
+        type: 'object',
+        properties: {
+          timeframe: {
+            type: 'string',
+            enum: ['today', 'yesterday', 'last_7_days', 'last_week', 'this_week', 'last_30_days', 'this_month', 'last_month'],
+            description: '取得するデータの時期（例：先週=last_week、今週=this_week、過去7日=last_7_days）'
+          },
+          metrics: {
+            type: 'array',
+            items: {
+              type: 'string',
+              enum: ['activeUsers', 'sessions', 'screenPageViews', 'bounceRate', 'sessionDuration']
+            },
+            description: '取得するメトリクス（例：ユーザー数=activeUsers、セッション数=sessions、ページビュー=screenPageViews）'
+          },
+          dimensions: {
+            type: 'array',
+            items: {
+              type: 'string',
+              enum: ['date', 'country', 'city', 'deviceCategory', 'browser']
+            },
+            description: '分析の軸となるディメンション（通常は date を含める）'
+          }
+        },
+        required: ['timeframe', 'metrics']
+      }
     }
   }
-
-  // デフォルトは昨日と今日
-  if (dateRanges.length === 0) {
-    return [
-      yesterday.toISOString().split('T')[0],
-      today.toISOString().split('T')[0]
-    ]
-  }
-
-  return dateRanges
-}
+]
 
 // Analytics APIから直接データを取得
 const fetchAnalyticsData = async (
@@ -138,62 +244,107 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // 質問から日付範囲を解析
-    const dates = parseDateFromQuestion(question)
-    let analyticsData = null
+    console.log('🔍 User Question:', question)
 
-    try {
-      // GA4データを取得
-      if (dates.length >= 2) {
-        analyticsData = await fetchAnalyticsData(
-          propertyId,
-          session.accessToken,
-          dates[0],
-          dates[dates.length - 1]
-        )
-      } else if (dates.length === 1) {
-        analyticsData = await fetchAnalyticsData(
-          propertyId,
-          session.accessToken,
-          dates[0],
-          dates[0]
-        )
-      }
-    } catch (analyticsError) {
-      console.error('Analytics API エラー:', analyticsError)
-      // Analytics APIのエラーがあってもAIに質問は送る
+    // Step 1: AIに質問を理解させて、必要なツール呼び出しを決定させる
+    const systemPrompt = `あなたはGoogle Analytics 4の専門分析者です。
+ユーザーからの質問に対して、適切なGA4データを取得するために必要なパラメータを決定してください。
+
+質問の例とパラメータ例：
+- "先週のユーザー数は?" → timeframe: "last_week", metrics: ["activeUsers"]
+- "今月のページビューの推移は?" → timeframe: "this_month", metrics: ["screenPageViews"], dimensions: ["date"]
+- "昨日と今日のセッション数を比較" → timeframe: "last_7_days", metrics: ["sessions"], dimensions: ["date"]
+- "過去30日間の傾向を教えて" → timeframe: "last_30_days", metrics: ["activeUsers", "sessions", "screenPageViews"], dimensions: ["date"]
+
+必ず get_analytics_data 関数を使って、質問に答えるために最適なデータを取得してください。`
+
+    const initialMessages: OpenAIMessage[] = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: question }
+    ]
+
+    // Step 2: AIにツール呼び出しを決定させる
+    console.log('🤖 AI analyzing question for data requirements...')
+    const toolResponse = await callOpenAI(initialMessages, analyticsTools, 'auto')
+
+    if (!toolResponse.toolCalls || toolResponse.toolCalls.length === 0) {
+      // フォールバック: ツール呼び出しに失敗した場合
+      console.log('⚠️ Tool calling failed, using fallback')
+      const fallbackResponse = await callOpenAI(initialMessages)
+      return NextResponse.json({
+        success: true,
+        response: fallbackResponse.content,
+        dataUsed: false
+      })
     }
 
-    // AIに分析を依頼
-    const systemPrompt = `あなたはGoogle Analyticsの専門分析者です。
-ユーザーからの質問に対して、提供されたデータを分析し、日本語で分かりやすく回答してください。
+    // Step 3: AIが決定したパラメータでGA4データを取得
+    const toolCall = toolResponse.toolCalls[0]
+    const functionArgs = JSON.parse(toolCall.function.arguments)
+    console.log('📊 AI determined parameters:', functionArgs)
 
-提供データがある場合は、そのデータを基に具体的な数値と洞察を提供してください。
-データがない場合は、一般的なGA4分析のアドバイスを提供してください。
+    const { timeframe, metrics = ['activeUsers', 'sessions', 'screenPageViews'], dimensions = ['date'] } = functionArgs
+
+    // 日付範囲を計算
+    const { startDate, endDate } = calculateDateRange(timeframe)
+    console.log('📅 Date range:', { timeframe, startDate, endDate })
+
+    // GA4データを取得
+    let analyticsData = null
+    try {
+      analyticsData = await fetchAnalyticsData(
+        propertyId,
+        session.accessToken,
+        startDate,
+        endDate,
+        metrics,
+        dimensions
+      )
+      console.log('✅ Analytics data fetched successfully')
+    } catch (analyticsError) {
+      console.error('❌ Analytics API エラー:', analyticsError)
+    }
+
+    // Step 4: 取得したデータでAIが最終回答を生成
+    const analysisPrompt = `あなたはGoogle Analytics 4の専門分析者です。
+取得したデータを基に、ユーザーの質問に対して具体的で分かりやすい日本語の回答を提供してください。
 
 回答は以下の形式を心がけてください：
-1. 具体的な数値（データがある場合）
+1. 具体的な数値とデータ
 2. トレンドや変化の分析
 3. 可能性のある原因や要因
 4. 改善提案やアクションアイテム
 
-簡潔で実用的な回答を心がけてください。`
+データが取得できた場合は、そのデータに基づいて詳細な分析を提供してください。`
 
-    const messages: OpenAIMessage[] = [
-      { role: 'system', content: systemPrompt },
+    const analysisMessages: OpenAIMessage[] = [
+      { role: 'system', content: analysisPrompt },
+      { role: 'user', content: question },
       {
-        role: 'user',
-        content: `質問: ${question}\n\nGA4データ: ${analyticsData ? JSON.stringify(analyticsData, null, 2) : 'データの取得に失敗しました'}`
+        role: 'function',
+        name: 'get_analytics_data',
+        content: JSON.stringify({
+          timeframe,
+          startDate,
+          endDate,
+          metrics,
+          dimensions,
+          data: analyticsData
+        })
       }
     ]
 
-    const aiResponse = await callOpenAI(messages)
+    console.log('🧠 AI generating final analysis...')
+    const finalResponse = await callOpenAI(analysisMessages)
 
     return NextResponse.json({
       success: true,
-      response: aiResponse,
+      response: finalResponse.content,
       dataUsed: analyticsData !== null,
-      dates: dates
+      timeframe,
+      dateRange: { startDate, endDate },
+      metrics,
+      dimensions
     })
 
   } catch (error) {
