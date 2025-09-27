@@ -9,6 +9,64 @@ interface OpenAIMessage {
   name?: string
 }
 
+// データ要約関数：大量のGA4データを要約してトークン数を削減
+const summarizeAnalyticsData = (data: any, metrics: string[], dimensions: string[]) => {
+  if (!data || !data.rows || data.rows.length === 0) {
+    return { total_rows: 0, metrics_summary: 'No data available' }
+  }
+
+  // 基本統計を計算
+  const totalRows = data.rows.length
+  const metricsSummary: any = {}
+
+  // 各メトリクスの合計・平均・最大・最小を計算
+  metrics.forEach((metric, index) => {
+    const values = data.rows
+      .map((row: any) => parseFloat(row.metricValues[index]?.value || '0'))
+      .filter((val: number) => !isNaN(val))
+
+    if (values.length > 0) {
+      metricsSummary[metric] = {
+        total: values.reduce((a, b) => a + b, 0),
+        average: values.reduce((a, b) => a + b, 0) / values.length,
+        max: Math.max(...values),
+        min: Math.min(...values)
+      }
+    }
+  })
+
+  // ディメンション別のトップ10を取得（ページ分析など）
+  let topDimensions: any = {}
+  if (dimensions.includes('pagePath') || dimensions.includes('pageTitle') || dimensions.includes('deviceCategory')) {
+    const dimensionData: any = {}
+    data.rows.forEach((row: any) => {
+      dimensions.forEach((dim, dimIndex) => {
+        const dimValue = row.dimensionValues[dimIndex]?.value || 'Unknown'
+        const metricValue = parseFloat(row.metricValues[0]?.value || '0')
+
+        if (!dimensionData[dim]) dimensionData[dim] = {}
+        if (!dimensionData[dim][dimValue]) dimensionData[dim][dimValue] = 0
+        dimensionData[dim][dimValue] += metricValue
+      })
+    })
+
+    // 各ディメンションのトップ10を作成
+    Object.keys(dimensionData).forEach(dim => {
+      const sorted = Object.entries(dimensionData[dim])
+        .sort(([,a], [,b]) => (b as number) - (a as number))
+        .slice(0, 10)
+      topDimensions[dim] = sorted
+    })
+  }
+
+  return {
+    total_rows: totalRows,
+    metrics_summary: metricsSummary,
+    top_dimensions: topDimensions,
+    sample_rows: data.rows.slice(0, 3) // 最初の3行のサンプル
+  }
+}
+
 interface OpenAIResponse {
   choices: Array<{
     message: {
@@ -230,7 +288,7 @@ const analyticsTools = [
             type: 'array',
             items: {
               type: 'string',
-              enum: ['date', 'country', 'city', 'deviceCategory', 'browser']
+              enum: ['date', 'country', 'city', 'deviceCategory', 'browser', 'pagePath', 'pageTitle']
             },
             description: '分析の軸となるディメンション（通常は date を含める）'
           }
@@ -331,12 +389,15 @@ export async function POST(request: NextRequest) {
 - "スマートフォンとデスクトップの売上を比較" → timeframe: "last_month", metrics: ["totalRevenue", "activeUsers"], dimensions: ["deviceCategory"]
 - "9月のデバイス別売上は?" → timeframe: "9月", metrics: ["totalRevenue", "transactions"], dimensions: ["deviceCategory", "date"]
 - "先週の売上とトランザクション数は?" → timeframe: "last_week", metrics: ["totalRevenue", "transactions"]
+- "今週最もよく見られたページは?" → timeframe: "this_week", metrics: ["screenPageViews"], dimensions: ["pagePath"]
+- "人気ページランキングを教えて" → timeframe: "last_30_days", metrics: ["screenPageViews", "activeUsers"], dimensions: ["pageTitle"]
 
 重要なポイント：
 - 売上に関する質問には必ず "totalRevenue" メトリクスを含める
 - デバイス別分析には "deviceCategory" ディメンションを含める
 - トランザクション分析には "transactions" メトリクスを含める
 - 比較や推移を求められた場合は適切なディメンション（date, deviceCategory等）を追加する
+- ページ分析には "pagePath" または "pageTitle" ディメンションを含める
 - 特定月の指定は月名で直接指定する（例：「9月」→ timeframe: "9月"、「8月」→ timeframe: "8月"）
 - 期間比較（先週vs今週等）では段階的分析を活用する：1回目で先週、2回目で今週、3回目で比較分析
 - 複雑な比較質問では、複数回のget_analytics_data呼び出しとcompare_analytics_data使用を検討する
@@ -407,7 +468,10 @@ export async function POST(request: NextRequest) {
             data: analyticsData
           })
 
-          // 会話履歴にツール結果を追加
+          // データを要約してトークン数を削減
+          const summarizedData = summarizeAnalyticsData(analyticsData, metrics, dimensions)
+
+          // 会話履歴にツール結果を追加（要約版）
           conversationHistory.push({
             role: 'function',
             name: 'get_analytics_data',
@@ -417,7 +481,7 @@ export async function POST(request: NextRequest) {
               endDate,
               metrics,
               dimensions,
-              data: analyticsData
+              summary: summarizedData
             })
           })
 
@@ -487,8 +551,9 @@ export async function POST(request: NextRequest) {
       { role: 'user', content: question }
     ]
 
-    // 全ての分析ステップの結果を追加
+    // 全ての分析ステップの結果を追加（要約版）
     analysisHistory.forEach((analysis) => {
+      const summarizedData = summarizeAnalyticsData(analysis.data, analysis.metrics, analysis.dimensions)
       analysisMessages.push({
         role: 'function',
         name: 'get_analytics_data',
@@ -499,18 +564,19 @@ export async function POST(request: NextRequest) {
           endDate: analysis.endDate,
           metrics: analysis.metrics,
           dimensions: analysis.dimensions,
-          data: analysis.data
+          summary: summarizedData
         })
       })
     })
 
-    // 分析履歴がない場合は従来通り
+    // 分析履歴がない場合は従来通り（要約版）
     if (analysisHistory.length === 0 && analyticsData) {
+      const summarizedData = summarizeAnalyticsData(analyticsData, ['screenPageViews'], ['date'])
       analysisMessages.push({
         role: 'function',
         name: 'get_analytics_data',
         content: JSON.stringify({
-          data: analyticsData
+          summary: summarizedData
         })
       })
     }
