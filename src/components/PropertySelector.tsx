@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { ChevronDown, Check, Globe } from 'lucide-react'
 
 interface Property {
@@ -48,7 +48,7 @@ export default function PropertySelector({ onPropertySelected, selectedPropertyI
 
     // バックグラウンドでプロパティ一覧を更新
     fetchProperties(true)
-  }, []) // fetchPropertiesは内部関数なので依存関係から除外
+  }, [fetchProperties]) // fetchPropertiesをuseCallbackでラップしたので追加
 
   useEffect(() => {
     if (selectedPropertyId && properties.length > 0) {
@@ -59,7 +59,7 @@ export default function PropertySelector({ onPropertySelected, selectedPropertyI
     }
   }, [selectedPropertyId, properties])
 
-  const fetchProperties = async (isBackgroundUpdate = false) => {
+  const fetchProperties = useCallback(async (isBackgroundUpdate = false) => {
     try {
       // バックグラウンド更新の場合はisUpdatingを使用
       if (isBackgroundUpdate) {
@@ -111,7 +111,7 @@ export default function PropertySelector({ onPropertySelected, selectedPropertyI
         setLoading(false)
       }
     }
-  }
+  }, [onPropertySelected])
 
   const selectProperty = (property: Property) => {
     setSelectedProperty(property)
@@ -263,6 +263,7 @@ export default function PropertySelector({ onPropertySelected, selectedPropertyI
         <div className="text-left">
           <div className="text-sm font-medium text-gray-900">{selectedProperty.name}</div>
           <div className="text-xs text-gray-500">ID: {selectedProperty.id}</div>
+          {isUpdating && <div className="text-xs text-blue-500">更新中...</div>}
         </div>
         <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>

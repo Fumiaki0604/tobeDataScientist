@@ -82,9 +82,9 @@ const callOpenAI = async (
 
     return { content: message?.content || '回答を生成できませんでした。' }
 
-  } catch (error) {
+  } catch (error: unknown) {
     clearTimeout(timeout)
-    if (error.name === 'AbortError') {
+    if (error instanceof Error && error.name === 'AbortError') {
       console.error('OpenAI API Timeout after 30 seconds')
       throw new Error('リクエストがタイムアウトしました。もう一度お試しください。')
     }
@@ -364,8 +364,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 3: 複数ツール呼び出し対応の段階的分析
-    let analysisHistory: any[] = []
-    let conversationHistory = [...initialMessages]
+    const analysisHistory: any[] = []
+    const conversationHistory = [...initialMessages]
     let currentToolResponse = toolResponse
 
     // 最大3回の分析ステップまで対応
@@ -488,7 +488,7 @@ export async function POST(request: NextRequest) {
     ]
 
     // 全ての分析ステップの結果を追加
-    analysisHistory.forEach((analysis, index) => {
+    analysisHistory.forEach((analysis) => {
       analysisMessages.push({
         role: 'function',
         name: 'get_analytics_data',
@@ -518,14 +518,29 @@ export async function POST(request: NextRequest) {
     console.log('🧠 AI generating final analysis...')
     const finalResponse = await callOpenAI(analysisMessages)
 
+    // 最終レスポンス用のサマリー情報を構築
+    const summary = latestAnalysis ? {
+      timeframe: latestAnalysis.timeframe,
+      dateRange: {
+        startDate: latestAnalysis.startDate,
+        endDate: latestAnalysis.endDate
+      },
+      metrics: latestAnalysis.metrics,
+      dimensions: latestAnalysis.dimensions,
+      stepsCompleted: analysisHistory.length
+    } : {
+      timeframe: 'unknown',
+      dateRange: { startDate: 'unknown', endDate: 'unknown' },
+      metrics: [],
+      dimensions: [],
+      stepsCompleted: 0
+    }
+
     return NextResponse.json({
       success: true,
       response: finalResponse.content,
       dataUsed: analyticsData !== null,
-      timeframe,
-      dateRange: { startDate, endDate },
-      metrics,
-      dimensions
+      ...summary
     })
 
   } catch (error) {
