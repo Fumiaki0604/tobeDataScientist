@@ -516,17 +516,14 @@ export async function POST(request: NextRequest) {
     analysisHistory.forEach((analysis) => {
       const summarizedData = summarizeAnalyticsData(analysis.data, analysis.metrics, analysis.dimensions)
       analysisMessages.push({
-        role: 'function',
-        name: 'get_analytics_data',
-        content: JSON.stringify({
-          step: analysis.step,
-          timeframe: analysis.timeframe,
-          startDate: analysis.startDate,
-          endDate: analysis.endDate,
-          metrics: analysis.metrics,
-          dimensions: analysis.dimensions,
-          summary: summarizedData
-        })
+        role: 'assistant',
+        content: `Google Analytics 4からデータを取得しました。
+期間: ${analysis.timeframe} (${analysis.startDate} ～ ${analysis.endDate})
+メトリクス: ${analysis.metrics.join(', ')}
+ディメンション: ${analysis.dimensions.join(', ')}
+
+分析結果のサマリー:
+${JSON.stringify(summarizedData, null, 2)}`
       })
     })
 
@@ -534,11 +531,11 @@ export async function POST(request: NextRequest) {
     if (analysisHistory.length === 0 && analyticsData) {
       const summarizedData = summarizeAnalyticsData(analyticsData, ['screenPageViews'], ['date'])
       analysisMessages.push({
-        role: 'function',
-        name: 'get_analytics_data',
-        content: JSON.stringify({
-          summary: summarizedData
-        })
+        role: 'assistant',
+        content: `Google Analytics 4からデータを取得しました。
+
+分析結果のサマリー:
+${JSON.stringify(summarizedData, null, 2)}`
       })
     }
 
