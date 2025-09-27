@@ -27,8 +27,8 @@ const summarizeAnalyticsData = (data: any, metrics: string[], dimensions: string
 
     if (values.length > 0) {
       metricsSummary[metric] = {
-        total: values.reduce((a, b) => a + b, 0),
-        average: values.reduce((a, b) => a + b, 0) / values.length,
+        total: values.reduce((a: number, b: number) => a + b, 0),
+        average: values.reduce((a: number, b: number) => a + b, 0) / values.length,
         max: Math.max(...values),
         min: Math.min(...values)
       }
@@ -36,7 +36,7 @@ const summarizeAnalyticsData = (data: any, metrics: string[], dimensions: string
   })
 
   // ディメンション別のトップ10を取得（ページ分析など）
-  let topDimensions: any = {}
+  const topDimensions: any = {}
   if (dimensions.includes('pagePath') || dimensions.includes('pageTitle') || dimensions.includes('deviceCategory')) {
     const dimensionData: any = {}
     data.rows.forEach((row: any) => {
@@ -426,7 +426,7 @@ export async function POST(request: NextRequest) {
 
     // Step 3: 複数ツール呼び出し対応の段階的分析
     const analysisHistory: any[] = []
-    let currentToolResponse = toolResponse
+    const currentToolResponse = toolResponse
 
     // 最大1回の分析ステップに制限してコンテキスト長を削減
     for (let step = 0; step < 1 && currentToolResponse.toolCalls && currentToolResponse.toolCalls.length > 0; step++) {
@@ -468,7 +468,7 @@ export async function POST(request: NextRequest) {
           })
 
           // データを要約してトークン数を削減
-          const summarizedData = summarizeAnalyticsData(analyticsData, metrics, dimensions)
+          summarizeAnalyticsData(analyticsData, metrics, dimensions)
           console.log('📊 Data summarized to reduce token usage')
 
         } catch (analyticsError) {
