@@ -94,7 +94,7 @@ const callOpenAI = async (
   console.log('OpenAI API Call - API Key exists:', !!apiKey)
 
   const requestBody: any = {
-    model: 'gpt-4o-mini',
+    model: 'gpt-5-mini',
     messages,
     temperature: 0.7,
     max_tokens: 1000,
