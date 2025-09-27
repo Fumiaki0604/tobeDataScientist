@@ -96,7 +96,7 @@ const callOpenAI = async (
   const requestBody: any = {
     model: 'gpt-5-mini',
     messages,
-    max_completion_tokens: 1000,
+    max_completion_tokens: 4000,
   }
 
   if (tools && tools.length > 0) {
@@ -141,7 +141,15 @@ const callOpenAI = async (
       return { toolCalls: message.tool_calls }
     }
 
-    return { content: message?.content || '回答を生成できませんでした。' }
+    const content = message?.content?.trim()
+    if (!content || content === '') {
+      console.log('Empty content detected, finish_reason:', data.choices[0]?.finish_reason)
+      if (data.choices[0]?.finish_reason === 'length') {
+        return { content: 'トークン制限により回答が切り詰められました。より簡潔な質問をお試しください。' }
+      }
+      return { content: '回答を生成できませんでした。' }
+    }
+    return { content }
 
   } catch (error: unknown) {
     clearTimeout(timeout)
