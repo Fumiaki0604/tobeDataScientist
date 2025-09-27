@@ -24,41 +24,6 @@ export default function PropertySelector({ onPropertySelected, selectedPropertyI
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null)
   const [isUpdating, setIsUpdating] = useState(false) // バックグラウンド更新用
 
-  useEffect(() => {
-    // ローカルストレージからキャッシュされたプロパティを読み込み
-    const cachedProperties = localStorage.getItem('ga4-properties-cache')
-    if (cachedProperties) {
-      try {
-        const parsed = JSON.parse(cachedProperties)
-        setProperties(parsed)
-
-        // 既に保存されているプロパティIDがあるかチェック
-        const savedPropertyId = localStorage.getItem('ga4-property-id')
-        if (savedPropertyId) {
-          const savedProperty = parsed.find((p: Property) => p.id === savedPropertyId)
-          if (savedProperty) {
-            setSelectedProperty(savedProperty)
-            onPropertySelected(savedPropertyId)
-          }
-        }
-      } catch (e) {
-        console.error('Failed to parse cached properties:', e)
-      }
-    }
-
-    // バックグラウンドでプロパティ一覧を更新
-    fetchProperties(true)
-  }, [fetchProperties]) // fetchPropertiesをuseCallbackでラップしたので追加
-
-  useEffect(() => {
-    if (selectedPropertyId && properties.length > 0) {
-      const property = properties.find(p => p.id === selectedPropertyId)
-      if (property) {
-        setSelectedProperty(property)
-      }
-    }
-  }, [selectedPropertyId, properties])
-
   const fetchProperties = useCallback(async (isBackgroundUpdate = false) => {
     try {
       // バックグラウンド更新の場合はisUpdatingを使用
@@ -112,6 +77,41 @@ export default function PropertySelector({ onPropertySelected, selectedPropertyI
       }
     }
   }, [onPropertySelected])
+
+  useEffect(() => {
+    // ローカルストレージからキャッシュされたプロパティを読み込み
+    const cachedProperties = localStorage.getItem('ga4-properties-cache')
+    if (cachedProperties) {
+      try {
+        const parsed = JSON.parse(cachedProperties)
+        setProperties(parsed)
+
+        // 既に保存されているプロパティIDがあるかチェック
+        const savedPropertyId = localStorage.getItem('ga4-property-id')
+        if (savedPropertyId) {
+          const savedProperty = parsed.find((p: Property) => p.id === savedPropertyId)
+          if (savedProperty) {
+            setSelectedProperty(savedProperty)
+            onPropertySelected(savedPropertyId)
+          }
+        }
+      } catch (e) {
+        console.error('Failed to parse cached properties:', e)
+      }
+    }
+
+    // バックグラウンドでプロパティ一覧を更新
+    fetchProperties(true)
+  }, [fetchProperties, onPropertySelected])
+
+  useEffect(() => {
+    if (selectedPropertyId && properties.length > 0) {
+      const property = properties.find(p => p.id === selectedPropertyId)
+      if (property) {
+        setSelectedProperty(property)
+      }
+    }
+  }, [selectedPropertyId, properties])
 
   const selectProperty = (property: Property) => {
     setSelectedProperty(property)
