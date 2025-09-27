@@ -426,11 +426,10 @@ export async function POST(request: NextRequest) {
 
     // Step 3: 複数ツール呼び出し対応の段階的分析
     const analysisHistory: any[] = []
-    const conversationHistory = [...initialMessages]
     let currentToolResponse = toolResponse
 
-    // 最大3回の分析ステップまで対応
-    for (let step = 0; step < 3 && currentToolResponse.toolCalls && currentToolResponse.toolCalls.length > 0; step++) {
+    // 最大1回の分析ステップに制限してコンテキスト長を削減
+    for (let step = 0; step < 1 && currentToolResponse.toolCalls && currentToolResponse.toolCalls.length > 0; step++) {
       const toolCall = currentToolResponse.toolCalls[0]
       console.log(`📊 Step ${step + 1}: ${toolCall.function.name}`)
 
@@ -470,20 +469,7 @@ export async function POST(request: NextRequest) {
 
           // データを要約してトークン数を削減
           const summarizedData = summarizeAnalyticsData(analyticsData, metrics, dimensions)
-
-          // 会話履歴にツール結果を追加（要約版）
-          conversationHistory.push({
-            role: 'function',
-            name: 'get_analytics_data',
-            content: JSON.stringify({
-              timeframe,
-              startDate,
-              endDate,
-              metrics,
-              dimensions,
-              summary: summarizedData
-            })
-          })
+          console.log('📊 Data summarized to reduce token usage')
 
         } catch (analyticsError) {
           console.error('❌ Analytics API エラー:', analyticsError)
@@ -492,35 +478,11 @@ export async function POST(request: NextRequest) {
 
       } else if (toolCall.function.name === 'compare_analytics_data') {
         console.log('🔄 Performing comparison analysis...')
-
-        // 比較分析のツール結果を追加
-        conversationHistory.push({
-          role: 'function',
-          name: 'compare_analytics_data',
-          content: JSON.stringify({
-            analysis_type: JSON.parse(toolCall.function.arguments).analysis_type,
-            previous_data_available: analysisHistory.length > 0,
-            steps_completed: analysisHistory.length
-          })
-        })
+        // 比較分析は分析履歴のデータを使用して実行
       }
 
-      // 次のツール呼び出しが必要かAIに判断させる
-      conversationHistory.push({
-        role: 'assistant',
-        content: `ステップ${step + 1}が完了しました。続けて分析が必要な場合は、適切なツールを呼び出してください。分析が完了した場合は、結果をまとめてください。`
-      })
-
-      try {
-        currentToolResponse = await callOpenAI(conversationHistory, analyticsTools, 'auto')
-        if (!currentToolResponse.toolCalls || currentToolResponse.toolCalls.length === 0) {
-          console.log('🏁 Analysis completed or no more tool calls needed')
-          break
-        }
-      } catch (error) {
-        console.error('❌ Error in follow-up tool analysis:', error)
-        break
-      }
+      // 1回の分析で完了
+      console.log('🏁 Single-step analysis completed')
     }
 
     // 最終分析で使用するデータ（最新の分析結果）
