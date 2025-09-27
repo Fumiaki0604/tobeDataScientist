@@ -97,7 +97,7 @@ const callOpenAI = async (
     model: 'gpt-5-mini',
     messages,
     temperature: 0.7,
-    max_tokens: 1000,
+    max_completion_tokens: 1000,
   }
 
   if (tools && tools.length > 0) {
