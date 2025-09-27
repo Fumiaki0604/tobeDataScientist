@@ -131,7 +131,11 @@ const callOpenAI = async (
     }
 
     const data: OpenAIResponse = await response.json()
+    console.log('OpenAI Response Data:', JSON.stringify(data, null, 2))
+
     const message = data.choices[0]?.message
+    console.log('Message content:', message?.content)
+    console.log('Message tool_calls:', message?.tool_calls)
 
     if (message?.tool_calls && message.tool_calls.length > 0) {
       return { toolCalls: message.tool_calls }
