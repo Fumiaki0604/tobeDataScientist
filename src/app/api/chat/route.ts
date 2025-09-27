@@ -80,6 +80,7 @@ interface OpenAIResponse {
         }
       }>
     }
+    finish_reason?: string
   }>
 }
 
