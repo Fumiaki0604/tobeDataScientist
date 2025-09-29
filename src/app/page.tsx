@@ -66,9 +66,19 @@ export default function Dashboard() {
       }
 
       const result = await response.json()
-      // データを日付順にソート
+      // データを日付順にソート（GA4の日付フォーマット "20250929" を考慮）
       const sortedData = (result.data || []).sort((a: AnalyticsDataItem, b: AnalyticsDataItem) => {
-        return new Date(a.date).getTime() - new Date(b.date).getTime()
+        // GA4の日付フォーマット "20250929" を "2025-09-29" に変換してソート
+        const parseGA4Date = (dateStr: string) => {
+          if (dateStr.length === 8) {
+            const year = dateStr.substring(0, 4)
+            const month = dateStr.substring(4, 6)
+            const day = dateStr.substring(6, 8)
+            return new Date(`${year}-${month}-${day}`).getTime()
+          }
+          return new Date(dateStr).getTime()
+        }
+        return parseGA4Date(a.date) - parseGA4Date(b.date)
       })
       setAnalyticsData(sortedData)
 
@@ -301,15 +311,31 @@ export default function Dashboard() {
                       <XAxis
                         dataKey="date"
                         tickFormatter={(value) => {
-                          const date = new Date(value)
-                          return `${date.getMonth() + 1}/${date.getDate()}`
+                          // GA4の日付フォーマット "20250929" を "2025-09-29" に変換
+                          const dateStr = value.toString()
+                          if (dateStr.length === 8) {
+                            const year = dateStr.substring(0, 4)
+                            const month = dateStr.substring(4, 6)
+                            const day = dateStr.substring(6, 8)
+                            const date = new Date(`${year}-${month}-${day}`)
+                            return `${date.getMonth() + 1}/${date.getDate()}`
+                          }
+                          return value
                         }}
                       />
                       <YAxis />
                       <Tooltip
                         labelFormatter={(value) => {
-                          const date = new Date(value)
-                          return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`
+                          // GA4の日付フォーマット "20250929" を "2025-09-29" に変換
+                          const dateStr = value.toString()
+                          if (dateStr.length === 8) {
+                            const year = dateStr.substring(0, 4)
+                            const month = dateStr.substring(4, 6)
+                            const day = dateStr.substring(6, 8)
+                            const date = new Date(`${year}-${month}-${day}`)
+                            return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`
+                          }
+                          return value
                         }}
                       />
                       <Line type="monotone" dataKey="sessions" stroke="#3b82f6" strokeWidth={2} />
@@ -331,15 +357,31 @@ export default function Dashboard() {
                       <XAxis
                         dataKey="date"
                         tickFormatter={(value) => {
-                          const date = new Date(value)
-                          return `${date.getMonth() + 1}/${date.getDate()}`
+                          // GA4の日付フォーマット "20250929" を "2025-09-29" に変換
+                          const dateStr = value.toString()
+                          if (dateStr.length === 8) {
+                            const year = dateStr.substring(0, 4)
+                            const month = dateStr.substring(4, 6)
+                            const day = dateStr.substring(6, 8)
+                            const date = new Date(`${year}-${month}-${day}`)
+                            return `${date.getMonth() + 1}/${date.getDate()}`
+                          }
+                          return value
                         }}
                       />
                       <YAxis />
                       <Tooltip
                         labelFormatter={(value) => {
-                          const date = new Date(value)
-                          return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`
+                          // GA4の日付フォーマット "20250929" を "2025-09-29" に変換
+                          const dateStr = value.toString()
+                          if (dateStr.length === 8) {
+                            const year = dateStr.substring(0, 4)
+                            const month = dateStr.substring(4, 6)
+                            const day = dateStr.substring(6, 8)
+                            const date = new Date(`${year}-${month}-${day}`)
+                            return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`
+                          }
+                          return value
                         }}
                       />
                       <Bar dataKey="screenPageViews" fill="#8b5cf6" />
