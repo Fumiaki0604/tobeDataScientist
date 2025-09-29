@@ -16,9 +16,17 @@ interface AnalyticsDataItem {
   totalRevenue: number
 }
 
+interface ChannelGroupDataItem {
+  sessionDefaultChannelGrouping: string
+  sessions: number
+  transactions: number
+  totalRevenue: number
+}
+
 export default function Dashboard() {
   const { data: session, status } = useSession()
   const [analyticsData, setAnalyticsData] = useState<AnalyticsDataItem[]>([])
+  const [channelGroupData, setChannelGroupData] = useState<ChannelGroupDataItem[]>([])
   const [loading, setLoading] = useState(false)
   const [dateRange, setDateRange] = useState('7daysAgo')
   const [error, setError] = useState('')
@@ -47,6 +55,7 @@ export default function Dashboard() {
     setError('')
 
     try {
+      // 日別データの取得
       const response = await fetch(`/api/analytics?startDate=${dateRange}&endDate=today&metrics=activeUsers,sessions,screenPageViews,transactions,totalRevenue&dimensions=date&propertyId=${propertyId}`)
 
       if (!response.ok) {
@@ -57,7 +66,23 @@ export default function Dashboard() {
       }
 
       const result = await response.json()
-      setAnalyticsData(result.data || [])
+      // データを日付順にソート
+      const sortedData = (result.data || []).sort((a: AnalyticsDataItem, b: AnalyticsDataItem) => {
+        return new Date(a.date).getTime() - new Date(b.date).getTime()
+      })
+      setAnalyticsData(sortedData)
+
+      // チャネルグループ別データの取得
+      const channelResponse = await fetch(`/api/analytics?startDate=${dateRange}&endDate=today&metrics=sessions,transactions,totalRevenue&dimensions=sessionDefaultChannelGrouping&propertyId=${propertyId}`)
+
+      if (channelResponse.ok) {
+        const channelResult = await channelResponse.json()
+        // セッション数で降順ソート
+        const sortedChannelData = (channelResult.data || []).sort((a: ChannelGroupDataItem, b: ChannelGroupDataItem) => {
+          return b.sessions - a.sessions
+        })
+        setChannelGroupData(sortedChannelData)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'エラーが発生しました')
     } finally {
@@ -273,9 +298,20 @@ export default function Dashboard() {
                   <ResponsiveContainer width="100%" height={300}>
                     <LineChart data={analyticsData}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" />
+                      <XAxis
+                        dataKey="date"
+                        tickFormatter={(value) => {
+                          const date = new Date(value)
+                          return `${date.getMonth() + 1}/${date.getDate()}`
+                        }}
+                      />
                       <YAxis />
-                      <Tooltip />
+                      <Tooltip
+                        labelFormatter={(value) => {
+                          const date = new Date(value)
+                          return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`
+                        }}
+                      />
                       <Line type="monotone" dataKey="sessions" stroke="#3b82f6" strokeWidth={2} />
                     </LineChart>
                   </ResponsiveContainer>
@@ -292,12 +328,95 @@ export default function Dashboard() {
                   <ResponsiveContainer width="100%" height={300}>
                     <BarChart data={analyticsData}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" />
+                      <XAxis
+                        dataKey="date"
+                        tickFormatter={(value) => {
+                          const date = new Date(value)
+                          return `${date.getMonth() + 1}/${date.getDate()}`
+                        }}
+                      />
                       <YAxis />
-                      <Tooltip />
+                      <Tooltip
+                        labelFormatter={(value) => {
+                          const date = new Date(value)
+                          return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`
+                        }}
+                      />
                       <Bar dataKey="screenPageViews" fill="#8b5cf6" />
                     </BarChart>
                   </ResponsiveContainer>
+                )}
+              </div>
+            </div>
+
+            {/* チャネルグループ別マトリックス */}
+            <div className="mt-8">
+              <div className="bg-white p-6 rounded-lg shadow-sm border">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">デフォルトチャネルグループ別分析</h3>
+                {loading ? (
+                  <div className="h-64 flex items-center justify-center">
+                    <div className="text-gray-500">読み込み中...</div>
+                  </div>
+                ) : channelGroupData.length === 0 ? (
+                  <div className="h-32 flex items-center justify-center">
+                    <div className="text-gray-500">チャネルグループデータがありません</div>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            チャネルグループ
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            セッション数
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            トランザクション数
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            売上
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            コンバージョン率
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            平均注文単価
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {channelGroupData.map((item, index) => {
+                          const conversionRate = item.sessions > 0 ? (item.transactions / item.sessions * 100) : 0
+                          const avgOrderValue = item.transactions > 0 ? (item.totalRevenue / item.transactions) : 0
+
+                          return (
+                            <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {item.sessionDefaultChannelGrouping || 'その他'}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {item.sessions.toLocaleString()}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {item.transactions.toLocaleString()}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                ¥{item.totalRevenue.toLocaleString()}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {conversionRate.toFixed(2)}%
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                ¥{avgOrderValue.toLocaleString()}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
             </div>
