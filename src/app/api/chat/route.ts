@@ -97,7 +97,7 @@ const callOpenAI = async (
   const requestBody: any = {
     model: 'gpt-5-mini',
     messages,
-    max_completion_tokens: 4000,
+    max_completion_tokens: 500,
   }
 
   if (tools && tools.length > 0) {
@@ -108,7 +108,7 @@ const callOpenAI = async (
   }
 
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 30000) // 30秒タイムアウト
+  const timeout = setTimeout(() => controller.abort(), 60000) // 60秒タイムアウト（GPT-5-mini reasoning対応）
 
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -387,34 +387,13 @@ export async function POST(request: NextRequest) {
     console.log('🔍 User Question:', question)
 
     // Step 1: AIに質問を理解させて、必要なツール呼び出しを決定させる
-    const systemPrompt = `あなたはGoogle Analytics 4の専門分析者です。
-ユーザーからの質問に対して、適切なGA4データを取得するために必要なパラメータを決定してください。
+    const systemPrompt = `GA4分析者です。質問に応じて適切なパラメータを決定してください。
 
-現在の日付: ${new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
-
-質問の例とパラメータ例：
+例：
 - "先週のユーザー数は?" → timeframe: "last_week", metrics: ["activeUsers"]
-- "今月のページビューの推移は?" → timeframe: "this_month", metrics: ["screenPageViews"], dimensions: ["date"]
-- "昨日と今日のセッション数を比較" → timeframe: "last_7_days", metrics: ["sessions"], dimensions: ["date"]
-- "先週と今週のPV数を比較" → 段階的分析: まずlast_week取得、次にthis_week取得、最後にcompare_analytics_data
-- "過去30日間の傾向を教えて" → timeframe: "last_30_days", metrics: ["activeUsers", "sessions", "screenPageViews"], dimensions: ["date"]
-- "スマートフォンとデスクトップの売上を比較" → timeframe: "last_month", metrics: ["totalRevenue", "activeUsers"], dimensions: ["deviceCategory"]
-- "9月のデバイス別売上は?" → timeframe: "9月", metrics: ["totalRevenue", "transactions"], dimensions: ["deviceCategory", "date"]
-- "先週の売上とトランザクション数は?" → timeframe: "last_week", metrics: ["totalRevenue", "transactions"]
-- "今週最もよく見られたページは?" → timeframe: "this_week", metrics: ["screenPageViews"], dimensions: ["pagePath"]
-- "人気ページランキングを教えて" → timeframe: "last_30_days", metrics: ["screenPageViews", "activeUsers"], dimensions: ["pageTitle"]
-
-重要なポイント：
-- 売上に関する質問には必ず "totalRevenue" メトリクスを含める
-- デバイス別分析には "deviceCategory" ディメンションを含める
-- トランザクション分析には "transactions" メトリクスを含める
-- 比較や推移を求められた場合は適切なディメンション（date, deviceCategory等）を追加する
-- ページ分析には "pagePath" または "pageTitle" ディメンションを含める
-- 特定月の指定は月名で直接指定する（例：「9月」→ timeframe: "9月"、「8月」→ timeframe: "8月"）
-- 期間比較（先週vs今週等）では段階的分析を活用する：1回目で先週、2回目で今週、3回目で比較分析
-- 複雑な比較質問では、複数回のget_analytics_data呼び出しとcompare_analytics_data使用を検討する
-
-必ず適切なツール（get_analytics_data, compare_analytics_data）を使って、段階的に質問に答えてください。`
+- "9月の売上は?" → timeframe: "9月", metrics: ["totalRevenue"]
+- "デバイス別PV数" → metrics: ["screenPageViews"], dimensions: ["deviceCategory"]
+売上→totalRevenue、デバイス→deviceCategory、ページ→pagePath、月指定→"9月"等`
 
     const initialMessages: OpenAIMessage[] = [
       { role: 'system', content: systemPrompt },
@@ -502,22 +481,7 @@ export async function POST(request: NextRequest) {
     const analyticsData = latestAnalysis?.data || null
 
     // Step 4: 取得したデータでAIが最終回答を生成
-    const analysisPrompt = `あなたはGoogle Analytics 4の専門分析者です。
-取得したデータを基に、ユーザーの質問に対して具体的で分かりやすい日本語の回答を提供してください。
-
-重要な注意事項：
-- ユーザーが「売上」について質問した場合は、必ずtotalRevenueデータを使用して回答してください
-- デバイス別分析では、deviceCategoryディメンションのデータを活用してください
-- 質問されていないメトリクス（activeUsers、sessionsなど）で回答を埋めることは避けてください
-- 具体的な数値が取得できない場合は、その旨を正直に伝えてください
-
-回答は以下の形式を心がけてください：
-1. 具体的な数値とデータ（質問に直接関連するもの）
-2. トレンドや変化の分析
-3. 可能性のある原因や要因
-4. 改善提案やアクションアイテム
-
-データが取得できた場合は、そのデータに基づいて詳細な分析を提供してください。`
+    const analysisPrompt = `取得したデータで質問に答えてください。数値のみ、1文で回答。`
 
     // 分析履歴を含む完全なコンテキストを構築
     const analysisMessages: OpenAIMessage[] = [
