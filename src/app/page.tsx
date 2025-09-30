@@ -23,10 +23,17 @@ interface ChannelGroupDataItem {
   totalRevenue: number
 }
 
+interface TopProductItem {
+  itemName: string
+  itemRevenue: number
+  itemsPurchased: number
+}
+
 export default function Dashboard() {
   const { data: session, status } = useSession()
   const [analyticsData, setAnalyticsData] = useState<AnalyticsDataItem[]>([])
   const [channelGroupData, setChannelGroupData] = useState<ChannelGroupDataItem[]>([])
+  const [topProducts, setTopProducts] = useState<TopProductItem[]>([])
   const [loading, setLoading] = useState(false)
   const [dateRange, setDateRange] = useState('7daysAgo')
   const [error, setError] = useState('')
@@ -92,6 +99,19 @@ export default function Dashboard() {
           return b.sessions - a.sessions
         })
         setChannelGroupData(sortedChannelData)
+      }
+
+      // 商品別売上TOP10の取得
+      const productsResponse = await fetch(`/api/analytics?startDate=${dateRange}&endDate=today&metrics=itemRevenue,itemsPurchased&dimensions=itemName&propertyId=${propertyId}`)
+
+      if (productsResponse.ok) {
+        const productsResult = await productsResponse.json()
+        // 売上で降順ソートしてTOP10を取得
+        const sortedProducts = (productsResult.data || [])
+          .filter((item: TopProductItem) => item.itemName && item.itemRevenue > 0)
+          .sort((a: TopProductItem, b: TopProductItem) => b.itemRevenue - a.itemRevenue)
+          .slice(0, 10)
+        setTopProducts(sortedProducts)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'エラーが発生しました')
@@ -311,7 +331,6 @@ export default function Dashboard() {
                       <XAxis
                         dataKey="date"
                         tickFormatter={(value) => {
-                          // GA4の日付フォーマット "20250929" を "2025-09-29" に変換
                           const dateStr = value.toString()
                           if (dateStr.length === 8) {
                             const year = dateStr.substring(0, 4)
@@ -326,7 +345,6 @@ export default function Dashboard() {
                       <YAxis />
                       <Tooltip
                         labelFormatter={(value) => {
-                          // GA4の日付フォーマット "20250929" を "2025-09-29" に変換
                           const dateStr = value.toString()
                           if (dateStr.length === 8) {
                             const year = dateStr.substring(0, 4)
@@ -357,7 +375,6 @@ export default function Dashboard() {
                       <XAxis
                         dataKey="date"
                         tickFormatter={(value) => {
-                          // GA4の日付フォーマット "20250929" を "2025-09-29" に変換
                           const dateStr = value.toString()
                           if (dateStr.length === 8) {
                             const year = dateStr.substring(0, 4)
@@ -372,7 +389,6 @@ export default function Dashboard() {
                       <YAxis />
                       <Tooltip
                         labelFormatter={(value) => {
-                          // GA4の日付フォーマット "20250929" を "2025-09-29" に変換
                           const dateStr = value.toString()
                           if (dateStr.length === 8) {
                             const year = dateStr.substring(0, 4)
@@ -385,6 +401,95 @@ export default function Dashboard() {
                         }}
                       />
                       <Bar dataKey="screenPageViews" fill="#8b5cf6" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+
+              <div className="bg-white p-6 rounded-lg shadow-sm border">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">トランザクション数推移</h3>
+                {loading ? (
+                  <div className="h-64 flex items-center justify-center">
+                    <div className="text-gray-500">読み込み中...</div>
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={analyticsData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis
+                        dataKey="date"
+                        tickFormatter={(value) => {
+                          const dateStr = value.toString()
+                          if (dateStr.length === 8) {
+                            const year = dateStr.substring(0, 4)
+                            const month = dateStr.substring(4, 6)
+                            const day = dateStr.substring(6, 8)
+                            const date = new Date(`${year}-${month}-${day}`)
+                            return `${date.getMonth() + 1}/${date.getDate()}`
+                          }
+                          return value
+                        }}
+                      />
+                      <YAxis />
+                      <Tooltip
+                        labelFormatter={(value) => {
+                          const dateStr = value.toString()
+                          if (dateStr.length === 8) {
+                            const year = dateStr.substring(0, 4)
+                            const month = dateStr.substring(4, 6)
+                            const day = dateStr.substring(6, 8)
+                            const date = new Date(`${year}-${month}-${day}`)
+                            return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`
+                          }
+                          return value
+                        }}
+                      />
+                      <Line type="monotone" dataKey="transactions" stroke="#f59e0b" strokeWidth={2} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+
+              <div className="bg-white p-6 rounded-lg shadow-sm border">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">売上推移</h3>
+                {loading ? (
+                  <div className="h-64 flex items-center justify-center">
+                    <div className="text-gray-500">読み込み中...</div>
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={analyticsData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis
+                        dataKey="date"
+                        tickFormatter={(value) => {
+                          const dateStr = value.toString()
+                          if (dateStr.length === 8) {
+                            const year = dateStr.substring(0, 4)
+                            const month = dateStr.substring(4, 6)
+                            const day = dateStr.substring(6, 8)
+                            const date = new Date(`${year}-${month}-${day}`)
+                            return `${date.getMonth() + 1}/${date.getDate()}`
+                          }
+                          return value
+                        }}
+                      />
+                      <YAxis />
+                      <Tooltip
+                        labelFormatter={(value) => {
+                          const dateStr = value.toString()
+                          if (dateStr.length === 8) {
+                            const year = dateStr.substring(0, 4)
+                            const month = dateStr.substring(4, 6)
+                            const day = dateStr.substring(6, 8)
+                            const date = new Date(`${year}-${month}-${day}`)
+                            return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`
+                          }
+                          return value
+                        }}
+                        formatter={(value: number) => `¥${value.toLocaleString()}`}
+                      />
+                      <Bar dataKey="totalRevenue" fill="#ef4444" />
                     </BarChart>
                   </ResponsiveContainer>
                 )}
@@ -452,6 +557,71 @@ export default function Dashboard() {
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                 ¥{avgOrderValue.toLocaleString()}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 売上上位商品TOP10 */}
+            <div className="mt-8">
+              <div className="bg-white p-6 rounded-lg shadow-sm border">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">売上上位商品 TOP10</h3>
+                {loading ? (
+                  <div className="h-64 flex items-center justify-center">
+                    <div className="text-gray-500">読み込み中...</div>
+                  </div>
+                ) : topProducts.length === 0 ? (
+                  <div className="h-32 flex items-center justify-center">
+                    <div className="text-gray-500">商品データがありません</div>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            順位
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            商品名
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            売上
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            購入数
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            平均単価
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {topProducts.map((item, index) => {
+                          const avgPrice = item.itemsPurchased > 0 ? item.itemRevenue / item.itemsPurchased : 0
+
+                          return (
+                            <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {index + 1}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {item.itemName}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                ¥{Math.round(item.itemRevenue).toLocaleString()}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {Math.round(item.itemsPurchased).toLocaleString()}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                ¥{Math.round(avgPrice).toLocaleString()}
                               </td>
                             </tr>
                           )
