@@ -28,8 +28,8 @@ export class DataProcessor {
       case 'ranking':
         return this.processRanking(data, question);
 
-      case 'comparison':
-        return this.processComparison(data, question);
+      case 'dimension_comparison':
+        return this.processDimensionComparison(data, question);
 
       case 'trend':
         return this.processTrend(data, question);
@@ -163,7 +163,8 @@ export class DataProcessor {
     return result;
   }
 
-  private processComparison(data: any[], question: string): string {
+  // ディメンション間の比較（デスクトップvsモバイル、オーガニックvsダイレクトなど）
+  private processDimensionComparison(data: any[], question: string): string {
     const firstItem = data[0];
     const keys = Object.keys(firstItem);
 
@@ -184,14 +185,32 @@ export class DataProcessor {
       aggregated[dimValue] = (aggregated[dimValue] || 0) + (item[relevantMetric] || 0);
     });
 
-    let result = `${this.getMetricDisplayName(relevantMetric)}の比較:\n\n`;
+    // 合計値を計算
+    const total = Object.values(aggregated).reduce((sum, val) => sum + val, 0);
 
-    Object.entries(aggregated)
-      .sort(([,a], [,b]) => b - a)
-      .forEach(([dimension, value]) => {
-        const formattedValue = this.formatNumber(value, relevantMetric);
-        result += `${dimension}: ${formattedValue}\n`;
-      });
+    // ディメンション名を取得
+    const dimensionDisplayName = this.getDimensionDisplayName(relevantDimension);
+    const metricDisplayName = this.getMetricDisplayName(relevantMetric);
+
+    let result = `${dimensionDisplayName}別の${metricDisplayName}比較:\n\n`;
+
+    // 降順でソート
+    const sortedEntries = Object.entries(aggregated).sort(([,a], [,b]) => b - a);
+
+    sortedEntries.forEach(([dimension, value]) => {
+      const formattedValue = this.formatNumber(value, relevantMetric);
+      const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
+      result += `${dimension}: ${formattedValue} (${percentage}%)\n`;
+    });
+
+    // 差分を表示（上位2つがある場合）
+    if (sortedEntries.length >= 2) {
+      const [first, second] = sortedEntries;
+      const diff = first[1] - second[1];
+      const diffPercentage = second[1] > 0 ? ((diff / second[1]) * 100).toFixed(1) : '0.0';
+
+      result += `\n📊 ${first[0]}は${second[0]}より${this.formatNumber(Math.abs(diff), relevantMetric)}多い（+${diffPercentage}%）`;
+    }
 
     return result;
   }
@@ -306,6 +325,18 @@ export class DataProcessor {
     };
 
     return displayNames[metric] || metric;
+  }
+
+  private getDimensionDisplayName(dimension: string): string {
+    const displayNames: Record<string, string> = {
+      'deviceCategory': 'デバイス',
+      'pagePath': 'ページパス',
+      'pageTitle': 'ページタイトル',
+      'sessionDefaultChannelGrouping': 'チャネル',
+      'date': '日付',
+    };
+
+    return displayNames[dimension] || dimension;
   }
 
   private formatNumber(value: number, metric: string): string {

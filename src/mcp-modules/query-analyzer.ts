@@ -10,7 +10,9 @@ export const AnalysisConfigSchema = z.object({
   }),
   metrics: z.array(z.string()),
   dimensions: z.array(z.string()),
-  analysisType: z.enum(['simple_query', 'comparison', 'ranking', 'trend', 'device_breakdown', 'period_comparison']),
+  analysisType: z.enum(['simple_query', 'dimension_comparison', 'ranking', 'trend', 'device_breakdown', 'period_comparison']),
+  comparisonType: z.enum(['dimension', 'period']).nullable().optional(),
+  comparisonValues: z.array(z.string()).nullable().optional(),
   filters: z.array(z.any()).optional(),
 });
 
@@ -180,7 +182,9 @@ JSONのみ返してください。説明は不要です。`;
   "timeframe": {"type": "relative", "period": "last_week"},
   "metrics": ["totalRevenue"],
   "dimensions": ["deviceCategory"],
-  "analysisType": "simple_query"
+  "analysisType": "simple_query",
+  "comparisonType": null,
+  "comparisonValues": null
 }
 
 指定可能な値:
@@ -188,7 +192,9 @@ JSONのみ返してください。説明は不要です。`;
 - timeframe.period: "today", "yesterday", "last_week", "this_week", "last_month", "this_month", "last_7_days", "last_30_days", "9月", "8月", "10月"
 - metrics: "totalRevenue", "sessions", "screenPageViews", "activeUsers", "transactions"
 - dimensions: "deviceCategory", "pagePath", "pageTitle", "sessionDefaultChannelGrouping", "date", または空配列
-- analysisType: "simple_query", "comparison", "ranking", "trend", "device_breakdown", "period_comparison"
+- analysisType: "simple_query", "dimension_comparison", "ranking", "trend", "device_breakdown", "period_comparison"
+- comparisonType: "dimension" (ディメンション間比較), "period" (期間比較), null (比較なし)
+- comparisonValues: 比較する値の配列 例: ["desktop", "mobile"], ["Organic Search", "Direct"], null
 
 ガイドライン:
 - 売上/収益/revenue/売り上げ → "totalRevenue"
@@ -198,11 +204,16 @@ JSONのみ返してください。説明は不要です。`;
 - 購入/トランザクション/コンバージョン → "transactions"
 - デバイス/device → dimensions: ["deviceCategory"]
 - ページ/page → dimensions: ["pagePath"]
-- チャネル/channel → dimensions: ["sessionDefaultChannelGrouping"]
+- チャネル/channel/流入元 → dimensions: ["sessionDefaultChannelGrouping"]
 - ランキング/順位/トップ → "ranking"
-- 比較/vs/対比 → "comparison"
 - 推移/変化/トレンド → "trend"
-- 期間比較（先月vs今月） → "period_comparison"
+- 期間比較（先月vs今月） → analysisType: "period_comparison", comparisonType: "period"
+- ディメンション比較（デスクトップvsモバイル、オーガニックvsダイレクト） → analysisType: "dimension_comparison", comparisonType: "dimension"
+
+比較の例:
+- "デスクトップとモバイルのセッション数を比較" → analysisType: "dimension_comparison", dimensions: ["deviceCategory"], comparisonValues: ["desktop", "mobile"]
+- "オーガニック検索とダイレクトの売上を比較" → analysisType: "dimension_comparison", dimensions: ["sessionDefaultChannelGrouping"], comparisonValues: ["Organic Search", "Direct"]
+- "先月と今月の売上を比較" → analysisType: "period_comparison", comparisonType: "period"
 
 JSONのみ返してください。説明は不要です。`;
 
