@@ -37,6 +37,9 @@ export class DataProcessor {
       case 'device_breakdown':
         return this.processDeviceBreakdown(data, question);
 
+      case 'forecast':
+        return this.processForecast(data, question);
+
       default:
         return this.processSimpleQuery(data, question);
     }
@@ -548,6 +551,77 @@ export class DataProcessor {
     }
 
     return trendResult + '\n\n予測: データ不足のため予測できません（3日以上のデータが必要）';
+  }
+
+  // 予測分析処理
+  private processForecast(data: any[], question: string): string {
+    const firstItem = data[0];
+    const keys = Object.keys(firstItem);
+    const metrics = keys.filter(key => typeof firstItem[key] === 'number');
+
+    if (metrics.length === 0 || !firstItem.date) {
+      return '予測分析には日付別のデータが必要です。dimensionsに"date"を含めてください。';
+    }
+
+    const relevantMetric = this.selectRelevantMetric(question, metrics);
+
+    // 日付でソート
+    const sortedData = data.sort((a, b) => {
+      const dateA = this.parseGA4Date(a.date);
+      const dateB = this.parseGA4Date(b.date);
+      return dateA.getTime() - dateB.getTime();
+    });
+
+    const values = sortedData.map(item => item[relevantMetric] || 0);
+
+    if (values.length < 7) {
+      return '予測には最低7日分のデータが必要です。現在のデータ: ' + values.length + '日分';
+    }
+
+    // 単純移動平均による予測
+    const windowSize = Math.min(7, values.length);
+    const recentValues = values.slice(-windowSize);
+    const average = recentValues.reduce((sum, val) => sum + val, 0) / windowSize;
+
+    // トレンドを計算（線形回帰の傾き）
+    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+    recentValues.forEach((y, i) => {
+      const x = i;
+      sumX += x;
+      sumY += y;
+      sumXY += x * y;
+      sumX2 += x * x;
+    });
+
+    const n = recentValues.length;
+    const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+    const intercept = (sumY - slope * sumX) / n;
+
+    // 質問から予測日数を抽出
+    let forecastDays = 7;
+    const dayMatch = question.match(/(\d+)日間/);
+    if (dayMatch) {
+      forecastDays = parseInt(dayMatch[1]);
+    }
+
+    // 予測値を計算
+    const predictions: number[] = [];
+    for (let i = 0; i < forecastDays; i++) {
+      const predictedValue = intercept + slope * (n + i);
+      predictions.push(Math.max(0, predictedValue)); // 負の値は0にする
+    }
+
+    const totalPredicted = predictions.reduce((sum, val) => sum + val, 0);
+    const metricDisplayName = this.getMetricDisplayName(relevantMetric);
+
+    let result = `📈 ${metricDisplayName}の予測（今後${forecastDays}日間）:\n\n`;
+    result += `過去${windowSize}日間の平均: ${this.formatNumber(average, relevantMetric)}/日\n`;
+    result += `トレンド: ${slope > 0 ? '上昇傾向' : slope < 0 ? '下降傾向' : '横ばい'} (${slope > 0 ? '+' : ''}${this.formatNumber(slope, relevantMetric)}/日)\n\n`;
+    result += `予測合計: ${this.formatNumber(totalPredicted, relevantMetric)}\n`;
+    result += `1日あたり平均: ${this.formatNumber(totalPredicted / forecastDays, relevantMetric)}\n\n`;
+    result += `⚠️ この予測は過去データの単純な傾向に基づいています。実際の値は季節性やイベントなどの影響を受ける可能性があります。`;
+
+    return result;
   }
 
   // 期間比較処理（先月vs今月など）

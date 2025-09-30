@@ -10,7 +10,7 @@ export const AnalysisConfigSchema = z.object({
   }),
   metrics: z.array(z.string()),
   dimensions: z.array(z.string()),
-  analysisType: z.enum(['simple_query', 'dimension_comparison', 'ranking', 'trend', 'device_breakdown', 'period_comparison']),
+  analysisType: z.enum(['simple_query', 'dimension_comparison', 'ranking', 'trend', 'device_breakdown', 'period_comparison', 'forecast']),
   comparisonType: z.enum(['dimension', 'period']).nullable().optional(),
   comparisonValues: z.array(z.string()).nullable().optional(),
   filters: z.array(z.any()).optional(),
@@ -192,7 +192,7 @@ JSONのみ返してください。説明は不要です。`;
 - timeframe.period: "today", "yesterday", "last_week", "this_week", "last_month", "this_month", "last_7_days", "last_30_days", "9月", "8月", "10月"
 - metrics: "totalRevenue", "sessions", "screenPageViews", "activeUsers", "transactions"
 - dimensions: "deviceCategory", "pagePath", "pageTitle", "sessionDefaultChannelGrouping", "date", または空配列
-- analysisType: "simple_query", "dimension_comparison", "ranking", "trend", "device_breakdown", "period_comparison"
+- analysisType: "simple_query", "dimension_comparison", "ranking", "trend", "device_breakdown", "period_comparison", "forecast"
 - comparisonType: "dimension" (ディメンション間比較), "period" (期間比較), null (比較なし)
 - comparisonValues: 比較する値の配列 例: ["desktop", "mobile"], ["Organic Search", "Direct"], null
 
@@ -207,6 +207,7 @@ JSONのみ返してください。説明は不要です。`;
 - チャネル/channel/流入元 → dimensions: ["sessionDefaultChannelGrouping"]
 - ランキング/順位/トップ → "ranking"
 - 推移/変化/トレンド → "trend"
+- 予測/予想/forecast → "forecast"
 - 期間比較（先月vs今月） → analysisType: "period_comparison", comparisonType: "period"
 - ディメンション比較（デスクトップvsモバイル、オーガニックvsダイレクト） → analysisType: "dimension_comparison", comparisonType: "dimension"
 
@@ -215,13 +216,27 @@ JSONのみ返してください。説明は不要です。`;
 - "オーガニック検索とダイレクトの売上を比較" → analysisType: "dimension_comparison", dimensions: ["sessionDefaultChannelGrouping"], comparisonValues: ["Organic Search", "Direct"]
 - "先月と今月の売上を比較" → analysisType: "period_comparison", comparisonType: "period"
 
+予測の例:
+- "今月のPV数の推移から今後7日間のPV数を予測" → analysisType: "forecast", dimensions: ["date"], timeframe: {"type": "relative", "period": "this_month"}
+- "先月のセッション数から今後の推移を予測" → analysisType: "forecast", dimensions: ["date"], timeframe: {"type": "relative", "period": "last_month"}
+
+重要: 予測分析(forecast)の場合は必ずdimensionsに["date"]を含めてください。
+
 JSONのみ返してください。説明は不要です。`;
 
     try {
       const response = await this.callOpenAI(prompt);
       console.log(`[QueryAnalyzer] 🤖 LLM response:`, response);
 
-      const config = JSON.parse(response);
+      // ```json ``` ブロックを除去
+      let cleanedResponse = response.trim();
+      if (cleanedResponse.startsWith('```json')) {
+        cleanedResponse = cleanedResponse.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+      } else if (cleanedResponse.startsWith('```')) {
+        cleanedResponse = cleanedResponse.replace(/^```\s*/, '').replace(/\s*```$/, '');
+      }
+
+      const config = JSON.parse(cleanedResponse);
       console.log(`[QueryAnalyzer] ✅ LLM analysis result:`, JSON.stringify(config, null, 2));
 
       return config;
