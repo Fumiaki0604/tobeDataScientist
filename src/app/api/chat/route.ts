@@ -30,7 +30,14 @@ export async function POST(request: NextRequest) {
     console.log('🔍 User Question:', question)
     console.log('🏢 Property ID:', propertyId)
 
-    const mcpClient = getMCPClient()
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) {
+      return NextResponse.json({
+        error: 'OpenAI API key not configured'
+      }, { status: 500 })
+    }
+
+    const mcpClient = getMCPClient(apiKey)
 
     try {
       // Step 1: MCPサーバーで質問を解析

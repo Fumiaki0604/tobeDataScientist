@@ -17,6 +17,12 @@ export const AnalysisConfigSchema = z.object({
 export type AnalysisConfig = z.infer<typeof AnalysisConfigSchema>;
 
 export class QueryAnalyzer {
+  private apiKey: string;
+
+  constructor(apiKey: string) {
+    this.apiKey = apiKey;
+  }
+
   // 頻出パターンのプリセット（5-10個程度に厳選）
   private quickPatterns = {
     // パターン1: デバイス別セッション
@@ -176,7 +182,7 @@ JSONのみ返してください。説明は不要です。`;
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Authorization': `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({

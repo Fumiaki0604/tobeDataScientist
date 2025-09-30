@@ -15,8 +15,8 @@ export class MCPClient {
   private ga4Client: GA4Client;
   private dataProcessor: DataProcessor;
 
-  constructor() {
-    this.queryAnalyzer = new QueryAnalyzer();
+  constructor(apiKey: string) {
+    this.queryAnalyzer = new QueryAnalyzer(apiKey);
     this.ga4Client = new GA4Client();
     this.dataProcessor = new DataProcessor();
   }
@@ -77,12 +77,7 @@ export class MCPClient {
   }
 }
 
-// シングルトンインスタンス
-let mcpClientInstance: MCPClient | null = null;
-
-export function getMCPClient(): MCPClient {
-  if (!mcpClientInstance) {
-    mcpClientInstance = new MCPClient();
-  }
-  return mcpClientInstance;
+// シングルトンインスタンスは使わず、毎回新しいインスタンスを作成
+export function getMCPClient(apiKey: string): MCPClient {
+  return new MCPClient(apiKey);
 }
