@@ -17,155 +17,195 @@ export const AnalysisConfigSchema = z.object({
 export type AnalysisConfig = z.infer<typeof AnalysisConfigSchema>;
 
 export class QueryAnalyzer {
-  // 時間関連のキーワードパターン
-  private timePatterns = {
-    '先週': { type: 'relative' as const, period: 'last_week' },
-    '今週': { type: 'relative' as const, period: 'this_week' },
-    '先月': { type: 'relative' as const, period: 'last_month' },
-    '今月': { type: 'relative' as const, period: 'this_month' },
-    '昨日': { type: 'relative' as const, period: 'yesterday' },
-    '今日': { type: 'relative' as const, period: 'today' },
-    '過去7日': { type: 'relative' as const, period: 'last_7_days' },
-    '過去30日': { type: 'relative' as const, period: 'last_30_days' },
-    '9月': { type: 'named' as const, period: '9月' },
-    '8月': { type: 'named' as const, period: '8月' },
-    '10月': { type: 'named' as const, period: '10月' },
-  };
+  // 頻出パターンのプリセット（5-10個程度に厳選）
+  private quickPatterns = {
+    // パターン1: デバイス別セッション
+    deviceSessions: {
+      pattern: /デバイス別.*セッション|セッション.*デバイス/i,
+      config: {
+        timeframe: { type: 'relative' as const, period: 'last_week' },
+        metrics: ['sessions'],
+        dimensions: ['deviceCategory'],
+        analysisType: 'device_breakdown' as const
+      }
+    },
 
-  // メトリクスのキーワードパターン
-  private metricPatterns = {
-    '売上': ['totalRevenue'],
-    '売り上げ': ['totalRevenue'],
-    '収益': ['totalRevenue'],
-    'revenue': ['totalRevenue'],
-    'PV': ['screenPageViews'],
-    'ページビュー': ['screenPageViews'],
-    'pageview': ['screenPageViews'],
-    'ユーザー': ['activeUsers'],
-    'user': ['activeUsers'],
-    'セッション': ['sessions'],
-    'session': ['sessions'],
-    'トランザクション': ['transactions'],
-    'transaction': ['transactions'],
-    '購入': ['transactions'],
-    'コンバージョン': ['transactions'],
-  };
+    // パターン2: PV系の質問
+    pageviews: {
+      pattern: /(先週|今週|昨日|今日).*PV|(先週|今週|昨日|今日).*ページビュー/i,
+      config: {
+        timeframe: { type: 'relative' as const, period: 'last_week' },
+        metrics: ['screenPageViews'],
+        dimensions: [],
+        analysisType: 'simple_query' as const
+      }
+    },
 
-  // ディメンションのキーワードパターン
-  private dimensionPatterns = {
-    'デバイス': ['deviceCategory'],
-    'device': ['deviceCategory'],
-    'ページ': ['pagePath', 'pageTitle'],
-    'page': ['pagePath', 'pageTitle'],
-    'チャネル': ['sessionDefaultChannelGrouping'],
-    'channel': ['sessionDefaultChannelGrouping'],
-    'ソース': ['sessionSource'],
-    'source': ['sessionSource'],
-    '日別': ['date'],
-    '推移': ['date'],
-    'トレンド': ['date'],
-    'trend': ['date'],
+    // パターン3: ランキング系
+    ranking: {
+      pattern: /(ランキング|順位|トップ).*PV|(ランキング|順位|トップ).*ページビュー/i,
+      config: {
+        timeframe: { type: 'relative' as const, period: 'last_30_days' },
+        metrics: ['screenPageViews'],
+        dimensions: ['pagePath'],
+        analysisType: 'ranking' as const
+      }
+    },
+
+    // パターン4: 売上系
+    revenue: {
+      pattern: /(先週|先月|今月).*売上|(先週|先月|今月).*収益/i,
+      config: {
+        timeframe: { type: 'relative' as const, period: 'last_month' },
+        metrics: ['totalRevenue'],
+        dimensions: [],
+        analysisType: 'simple_query' as const
+      }
+    },
+
+    // パターン5: デバイス別 + 割合
+    devicePercentage: {
+      pattern: /デバイス別.*割合|割合.*デバイス/i,
+      config: {
+        timeframe: { type: 'relative' as const, period: 'last_week' },
+        metrics: ['sessions'],
+        dimensions: ['deviceCategory'],
+        analysisType: 'device_breakdown' as const
+      }
+    }
   };
 
   async analyzeQuery(question: string, propertyId: string): Promise<AnalysisConfig> {
     console.log(`[QueryAnalyzer] Analyzing: "${question}"`);
 
-    // 1. 時間範囲の解析
-    const timeframe = this.extractTimeframe(question);
+    // Step 1: 高速パターンマッチング
+    const quickResult = this.tryQuickPatterns(question);
+    if (quickResult.matched && quickResult.config) {
+      console.log(`[QueryAnalyzer] ✅ Quick pattern matched: ${quickResult.patternName}`);
+      return this.adjustTimeframe(quickResult.config, question);
+    }
 
-    // 2. メトリクスの抽出
-    const metrics = this.extractMetrics(question);
-
-    // 3. ディメンションの抽出
-    const dimensions = this.extractDimensions(question);
-
-    // 4. 分析タイプの判定
-    const analysisType = this.determineAnalysisType(question);
-
-    const config: AnalysisConfig = {
-      timeframe,
-      metrics: metrics.length > 0 ? metrics : ['screenPageViews'], // デフォルト
-      dimensions: dimensions.length > 0 ? dimensions : [], // デフォルトは空
-      analysisType,
-    };
-
-    console.log(`[QueryAnalyzer] Result:`, JSON.stringify(config, null, 2));
-    return config;
+    // Step 2: LLMフォールバック
+    console.log(`[QueryAnalyzer] 🤖 Falling back to LLM analysis...`);
+    return await this.llmAnalyze(question);
   }
 
-  private extractTimeframe(question: string) {
-    // 時間キーワードの検索
-    for (const [keyword, pattern] of Object.entries(this.timePatterns)) {
-      if (question.includes(keyword)) {
+  private tryQuickPatterns(question: string): { matched: boolean; patternName?: string; config?: AnalysisConfig } {
+    for (const [name, pattern] of Object.entries(this.quickPatterns)) {
+      if (pattern.pattern.test(question)) {
         return {
-          type: pattern.type,
-          period: pattern.period,
+          matched: true,
+          patternName: name,
+          config: JSON.parse(JSON.stringify(pattern.config)) // Deep copy
         };
       }
     }
-
-    // デフォルトは過去7日間
-    return {
-      type: 'relative' as const,
-      period: 'last_7_days',
-    };
+    return { matched: false };
   }
 
-  private extractMetrics(question: string): string[] {
-    const extractedMetrics: string[] = [];
-
-    for (const [keyword, metrics] of Object.entries(this.metricPatterns)) {
-      if (question.toLowerCase().includes(keyword.toLowerCase())) {
-        extractedMetrics.push(...metrics);
-      }
+  private adjustTimeframe(config: AnalysisConfig, question: string): AnalysisConfig {
+    // 質問から具体的な時間を抽出してconfigを調整
+    if (question.includes('先週')) {
+      config.timeframe = { type: 'relative', period: 'last_week' };
+    } else if (question.includes('今週')) {
+      config.timeframe = { type: 'relative', period: 'this_week' };
+    } else if (question.includes('先月')) {
+      config.timeframe = { type: 'relative', period: 'last_month' };
+    } else if (question.includes('今月')) {
+      config.timeframe = { type: 'relative', period: 'this_month' };
+    } else if (question.includes('昨日')) {
+      config.timeframe = { type: 'relative', period: 'yesterday' };
+    } else if (question.includes('今日')) {
+      config.timeframe = { type: 'relative', period: 'today' };
     }
 
-    // 重複除去
-    return [...new Set(extractedMetrics)];
+    return config;
   }
 
-  private extractDimensions(question: string): string[] {
-    const extractedDimensions: string[] = [];
+  private async llmAnalyze(question: string): Promise<AnalysisConfig> {
+    const prompt = `GA4分析質問を解析してJSONで回答してください：
 
-    for (const [keyword, dimensions] of Object.entries(this.dimensionPatterns)) {
-      if (question.toLowerCase().includes(keyword.toLowerCase())) {
-        extractedDimensions.push(...dimensions);
-      }
+質問: "${question}"
+
+以下のフォーマットで正確なJSONのみを返してください：
+{
+  "timeframe": {"type": "relative", "period": "last_week"},
+  "metrics": ["totalRevenue"],
+  "dimensions": ["deviceCategory"],
+  "analysisType": "simple_query"
+}
+
+指定可能な値:
+- timeframe.type: "relative", "absolute", "named"
+- timeframe.period: "today", "yesterday", "last_week", "this_week", "last_month", "this_month", "last_7_days", "last_30_days", "9月", "8月", "10月"
+- metrics: "totalRevenue", "sessions", "screenPageViews", "activeUsers", "transactions"
+- dimensions: "deviceCategory", "pagePath", "pageTitle", "sessionDefaultChannelGrouping", "date", または空配列
+- analysisType: "simple_query", "comparison", "ranking", "trend", "device_breakdown", "period_comparison"
+
+ガイドライン:
+- 売上/収益/revenue/売り上げ → "totalRevenue"
+- PV/ページビュー/閲覧/page view → "screenPageViews"
+- ユーザー/訪問者/user → "activeUsers"
+- セッション/session → "sessions"
+- 購入/トランザクション/コンバージョン → "transactions"
+- デバイス/device → dimensions: ["deviceCategory"]
+- ページ/page → dimensions: ["pagePath"]
+- チャネル/channel → dimensions: ["sessionDefaultChannelGrouping"]
+- ランキング/順位/トップ → "ranking"
+- 比較/vs/対比 → "comparison"
+- 推移/変化/トレンド → "trend"
+- 期間比較（先月vs今月） → "period_comparison"
+
+JSONのみ返してください。説明は不要です。`;
+
+    try {
+      const response = await this.callOpenAI(prompt);
+      console.log(`[QueryAnalyzer] 🤖 LLM response:`, response);
+
+      const config = JSON.parse(response);
+      console.log(`[QueryAnalyzer] ✅ LLM analysis result:`, JSON.stringify(config, null, 2));
+
+      return config;
+    } catch (error) {
+      console.error(`[QueryAnalyzer] ❌ LLM analysis failed:`, error);
+
+      // フォールバック設定
+      return {
+        timeframe: { type: 'relative', period: 'last_week' },
+        metrics: ['screenPageViews'],
+        dimensions: [],
+        analysisType: 'simple_query'
+      };
     }
-
-    // 重複除去
-    return [...new Set(extractedDimensions)];
   }
 
-  private determineAnalysisType(question: string): AnalysisConfig['analysisType'] {
-    const lowerQuestion = question.toLowerCase();
+  private async callOpenAI(prompt: string): Promise<string> {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-5-mini',
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        max_completion_tokens: 300,
+      }),
+    });
 
-    // 期間比較の検出（先月vs今月、先週vs今週など）
-    if ((lowerQuestion.includes('比較') || lowerQuestion.includes('vs') || lowerQuestion.includes('対')) &&
-        (lowerQuestion.includes('先月') && lowerQuestion.includes('今月') ||
-         lowerQuestion.includes('先週') && lowerQuestion.includes('今週') ||
-         lowerQuestion.includes('去年') && lowerQuestion.includes('今年'))) {
-      return 'period_comparison';
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.status}`);
     }
 
-    if (lowerQuestion.includes('比較') || lowerQuestion.includes('vs') || lowerQuestion.includes('対')) {
-      return 'comparison';
-    }
-
-    if (lowerQuestion.includes('ランキング') || lowerQuestion.includes('順位') || lowerQuestion.includes('トップ') || lowerQuestion.includes('最も')) {
-      return 'ranking';
-    }
-
-    if (lowerQuestion.includes('推移') || lowerQuestion.includes('変化') || lowerQuestion.includes('トレンド') || lowerQuestion.includes('傾向')) {
-      return 'trend';
-    }
-
-    if (lowerQuestion.includes('デバイス') || lowerQuestion.includes('device')) {
-      return 'device_breakdown';
-    }
-
-    return 'simple_query';
+    const result = await response.json();
+    return result.choices[0].message.content.trim();
   }
+
 
   // 日付範囲の計算
   calculateDateRange(timeframe: AnalysisConfig['timeframe']): { startDate: string; endDate: string } {
