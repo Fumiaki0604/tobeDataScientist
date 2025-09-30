@@ -54,16 +54,27 @@ export async function POST(request: NextRequest) {
       let ga4Data: any;
 
       if (analysisConfig.analysisType === 'period_comparison') {
-        // 期間比較の場合、質問から2つの期間を抽出
-        console.log('📅 Extracting comparison periods...')
-        const periods = extractComparisonPeriods(question)
+        // 期間比較の場合、LLMで質問から2つの期間を抽出
+        console.log('📅 Extracting comparison periods with LLM...')
+        const periodsResult = await mcpClient.callTool('extract_comparison_periods', { question })
+        const periods = JSON.parse(periodsResult.content[0].text)
         console.log('📅 Comparison periods:', periods)
+
+        // 各期間の日付範囲を計算
+        const dateRange1Result = await mcpClient.callTool('calculate_date_range_from_period', { period: periods.period1 })
+        const dateRange1 = JSON.parse(dateRange1Result.content[0].text)
+
+        const dateRange2Result = await mcpClient.callTool('calculate_date_range_from_period', { period: periods.period2 })
+        const dateRange2 = JSON.parse(dateRange2Result.content[0].text)
+
+        console.log('📅 Period 1 dates:', dateRange1)
+        console.log('📅 Period 2 dates:', dateRange2)
 
         // 2つの期間のデータを取得
         const period1Data = await mcpClient.callTool('fetch_ga4_data', {
           propertyId,
-          startDate: periods.period1.startDate,
-          endDate: periods.period1.endDate,
+          startDate: dateRange1.startDate,
+          endDate: dateRange1.endDate,
           metrics: analysisConfig.metrics,
           dimensions: analysisConfig.dimensions,
           accessToken: session.accessToken,
@@ -71,8 +82,8 @@ export async function POST(request: NextRequest) {
 
         const period2Data = await mcpClient.callTool('fetch_ga4_data', {
           propertyId,
-          startDate: periods.period2.startDate,
-          endDate: periods.period2.endDate,
+          startDate: dateRange2.startDate,
+          endDate: dateRange2.endDate,
           metrics: analysisConfig.metrics,
           dimensions: analysisConfig.dimensions,
           accessToken: session.accessToken,
@@ -145,73 +156,6 @@ export async function POST(request: NextRequest) {
       response: 'システムエラーが発生しました。',
       error: error instanceof Error ? error.message : 'Unknown error',
     }, { status: 500 })
-  }
-}
-
-// 期間比較のための2つの期間を抽出
-function extractComparisonPeriods(question: string) {
-  const today = new Date()
-
-  // 先月 vs 今月
-  if (question.includes('先月') && question.includes('今月')) {
-    const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1)
-    const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1)
-    const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0)
-
-    return {
-      period1: {
-        label: '先月',
-        startDate: formatDate(lastMonthStart),
-        endDate: formatDate(lastMonthEnd)
-      },
-      period2: {
-        label: '今月',
-        startDate: formatDate(thisMonthStart),
-        endDate: formatDate(today)
-      }
-    }
-  }
-
-  // 先週 vs 今週
-  if (question.includes('先週') && question.includes('今週')) {
-    const thisWeekStart = new Date(today)
-    thisWeekStart.setDate(today.getDate() - today.getDay())
-
-    const lastWeekEnd = new Date(today)
-    lastWeekEnd.setDate(today.getDate() - today.getDay() - 1)
-    const lastWeekStart = new Date(lastWeekEnd)
-    lastWeekStart.setDate(lastWeekEnd.getDate() - 6)
-
-    return {
-      period1: {
-        label: '先週',
-        startDate: formatDate(lastWeekStart),
-        endDate: formatDate(lastWeekEnd)
-      },
-      period2: {
-        label: '今週',
-        startDate: formatDate(thisWeekStart),
-        endDate: formatDate(today)
-      }
-    }
-  }
-
-  // デフォルト: 先月 vs 今月
-  const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1)
-  const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1)
-  const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0)
-
-  return {
-    period1: {
-      label: '先月',
-      startDate: formatDate(lastMonthStart),
-      endDate: formatDate(lastMonthEnd)
-    },
-    period2: {
-      label: '今月',
-      startDate: formatDate(thisMonthStart),
-      endDate: formatDate(today)
-    }
   }
 }
 

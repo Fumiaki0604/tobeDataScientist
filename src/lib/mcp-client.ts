@@ -67,6 +67,34 @@ export class MCPClient {
           };
         }
 
+        case 'extract_comparison_periods': {
+          const { question } = args;
+          const periods = await this.queryAnalyzer.extractComparisonPeriods(question);
+
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(periods, null, 2),
+              },
+            ],
+          };
+        }
+
+        case 'calculate_date_range_from_period': {
+          const { period } = args;
+          const dateRange = this.queryAnalyzer.calculateDateRangeFromPeriod(period);
+
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(dateRange, null, 2),
+              },
+            ],
+          };
+        }
+
         default:
           throw new Error(`Unknown tool: ${toolName}`);
       }
