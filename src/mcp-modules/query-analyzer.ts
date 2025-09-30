@@ -78,15 +78,8 @@ export class QueryAnalyzer {
   async analyzeQuery(question: string, propertyId: string): Promise<AnalysisConfig> {
     console.log(`[QueryAnalyzer] Analyzing: "${question}"`);
 
-    // Step 1: 高速パターンマッチング
-    const quickResult = this.tryQuickPatterns(question);
-    if (quickResult.matched && quickResult.config) {
-      console.log(`[QueryAnalyzer] ✅ Quick pattern matched: ${quickResult.patternName}`);
-      return this.adjustTimeframe(quickResult.config, question);
-    }
-
-    // Step 2: LLMフォールバック
-    console.log(`[QueryAnalyzer] 🤖 Falling back to LLM analysis...`);
+    // 完全LLMベースの分析
+    console.log(`[QueryAnalyzer] 🤖 Using LLM analysis...`);
     return await this.llmAnalyze(question);
   }
 
