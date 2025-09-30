@@ -126,7 +126,7 @@ export default function ChatInterface({ propertyId }: ChatInterfaceProps) {
       {/* チャットヘッダー */}
       <div className="p-4 border-b bg-gray-50 rounded-t-lg">
         <h2 className="text-lg font-semibold text-gray-900">GA4 分析チャット</h2>
-        <p className="text-sm text-gray-600">データについて自然言語で質問してください</p>
+        <p className="text-sm text-gray-900">データについて自然言語で質問してください</p>
       </div>
 
       {/* メッセージ一覧 */}
@@ -142,7 +142,7 @@ export default function ChatInterface({ propertyId }: ChatInterfaceProps) {
             <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
               message.role === 'user'
                 ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 text-gray-600'
+                : 'bg-gray-200 text-gray-900'
             }`}>
               {message.role === 'user' ? (
                 <User className="h-4 w-4" />
@@ -162,7 +162,7 @@ export default function ChatInterface({ propertyId }: ChatInterfaceProps) {
               }`}>
                 <div className="whitespace-pre-wrap">{message.content}</div>
               </div>
-              <div className="text-xs text-gray-500 mt-1">
+              <div className="text-xs text-gray-900 mt-1">
                 {message.timestamp.toLocaleTimeString('ja-JP', {
                   hour: '2-digit',
                   minute: '2-digit'
@@ -175,7 +175,7 @@ export default function ChatInterface({ propertyId }: ChatInterfaceProps) {
         {/* ローディング表示 */}
         {isLoading && (
           <div className="flex items-start gap-3">
-            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center">
+            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-200 text-gray-900 flex items-center justify-center">
               <Bot className="h-4 w-4" />
             </div>
             <div className="flex-1 max-w-3xl">
@@ -216,7 +216,7 @@ export default function ChatInterface({ propertyId }: ChatInterfaceProps) {
 
         {/* 使用例 */}
         <div className="mt-3">
-          <p className="text-xs text-gray-500 mb-2">質問例:</p>
+          <p className="text-xs text-gray-900 mb-2">質問例:</p>
           <div className="flex flex-wrap gap-2">
             {[
               '昨日と今日のPV数を比較してください',

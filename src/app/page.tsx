@@ -138,7 +138,7 @@ export default function Dashboard() {
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
         <div className="bg-white p-8 rounded-lg shadow-md text-center max-w-md">
           <h1 className="text-2xl font-bold mb-4">GA4 分析チャット</h1>
-          <p className="text-gray-600 mb-6">
+          <p className="text-gray-900 mb-6">
             Google Analytics 4のデータをAIと対話しながら分析できるツールです。
             <br />
             Googleアカウントでログインしてください。
@@ -179,7 +179,7 @@ export default function Dashboard() {
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">GA4 分析ツール</h1>
-              <p className="text-sm text-gray-600">AIと対話しながらデータを分析</p>
+              <p className="text-sm text-gray-900">AIと対話しながらデータを分析</p>
             </div>
 
             <div className="flex items-center gap-4">
@@ -188,8 +188,15 @@ export default function Dashboard() {
                 selectedPropertyId={propertyId}
               />
 
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-600">{session.user?.email}</span>
+              <div className="flex items-center gap-3">
+                {session.user?.image && (
+                  <img
+                    src={session.user.image}
+                    alt={session.user.name || 'User'}
+                    className="w-8 h-8 rounded-full"
+                  />
+                )}
+                <span className="text-sm text-gray-900">{session.user?.email}</span>
                 <button
                   onClick={() => signOut()}
                   className="text-sm text-red-600 hover:text-red-700"
@@ -208,7 +215,7 @@ export default function Dashboard() {
                 className={`py-2 px-1 border-b-2 font-medium text-sm ${
                   activeTab === 'chat'
                     ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    : 'border-transparent text-gray-900 hover:text-gray-900 hover:border-gray-300'
                 }`}
               >
                 <div className="flex items-center gap-2">
@@ -222,7 +229,7 @@ export default function Dashboard() {
                 className={`py-2 px-1 border-b-2 font-medium text-sm ${
                   activeTab === 'dashboard'
                     ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    : 'border-transparent text-gray-900 hover:text-gray-900 hover:border-gray-300'
                 }`}
               >
                 <div className="flex items-center gap-2">
@@ -267,7 +274,7 @@ export default function Dashboard() {
                 <div className="flex items-center">
                   <Users className="h-8 w-8 text-blue-600" />
                   <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">アクティブユーザー</p>
+                    <p className="text-sm font-medium text-gray-900">アクティブユーザー</p>
                     <p className="text-2xl font-semibold text-gray-900">{totalUsers.toLocaleString()}</p>
                   </div>
                 </div>
@@ -277,7 +284,7 @@ export default function Dashboard() {
                 <div className="flex items-center">
                   <MousePointer className="h-8 w-8 text-green-600" />
                   <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">セッション</p>
+                    <p className="text-sm font-medium text-gray-900">セッション</p>
                     <p className="text-2xl font-semibold text-gray-900">{totalSessions.toLocaleString()}</p>
                   </div>
                 </div>
@@ -287,7 +294,7 @@ export default function Dashboard() {
                 <div className="flex items-center">
                   <Eye className="h-8 w-8 text-purple-600" />
                   <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">ページビュー</p>
+                    <p className="text-sm font-medium text-gray-900">ページビュー</p>
                     <p className="text-2xl font-semibold text-gray-900">{totalPageviews.toLocaleString()}</p>
                   </div>
                 </div>
@@ -297,7 +304,7 @@ export default function Dashboard() {
                 <div className="flex items-center">
                   <BarChart3 className="h-8 w-8 text-orange-600" />
                   <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">トランザクション</p>
+                    <p className="text-sm font-medium text-gray-900">トランザクション</p>
                     <p className="text-2xl font-semibold text-gray-900">{totalTransactions.toLocaleString()}</p>
                   </div>
                 </div>
@@ -309,7 +316,7 @@ export default function Dashboard() {
                     <span className="text-lg font-bold">¥</span>
                   </div>
                   <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">売上</p>
+                    <p className="text-sm font-medium text-gray-900">売上</p>
                     <p className="text-2xl font-semibold text-gray-900">¥{totalRevenue.toLocaleString()}</p>
                   </div>
                 </div>
@@ -321,7 +328,7 @@ export default function Dashboard() {
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">セッション推移</h3>
                 {loading ? (
                   <div className="h-64 flex items-center justify-center">
-                    <div className="text-gray-500">読み込み中...</div>
+                    <div className="text-gray-900">読み込み中...</div>
                   </div>
                 ) : (
                   <ResponsiveContainer width="100%" height={300}>
@@ -365,7 +372,7 @@ export default function Dashboard() {
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">ページビュー推移</h3>
                 {loading ? (
                   <div className="h-64 flex items-center justify-center">
-                    <div className="text-gray-500">読み込み中...</div>
+                    <div className="text-gray-900">読み込み中...</div>
                   </div>
                 ) : (
                   <ResponsiveContainer width="100%" height={300}>
@@ -409,7 +416,7 @@ export default function Dashboard() {
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">トランザクション数推移</h3>
                 {loading ? (
                   <div className="h-64 flex items-center justify-center">
-                    <div className="text-gray-500">読み込み中...</div>
+                    <div className="text-gray-900">読み込み中...</div>
                   </div>
                 ) : (
                   <ResponsiveContainer width="100%" height={300}>
@@ -453,7 +460,7 @@ export default function Dashboard() {
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">売上推移</h3>
                 {loading ? (
                   <div className="h-64 flex items-center justify-center">
-                    <div className="text-gray-500">読み込み中...</div>
+                    <div className="text-gray-900">読み込み中...</div>
                   </div>
                 ) : (
                   <ResponsiveContainer width="100%" height={300}>
@@ -501,33 +508,33 @@ export default function Dashboard() {
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">デフォルトチャネルグループ別分析</h3>
                 {loading ? (
                   <div className="h-64 flex items-center justify-center">
-                    <div className="text-gray-500">読み込み中...</div>
+                    <div className="text-gray-900">読み込み中...</div>
                   </div>
                 ) : channelGroupData.length === 0 ? (
                   <div className="h-32 flex items-center justify-center">
-                    <div className="text-gray-500">チャネルグループデータがありません</div>
+                    <div className="text-gray-900">チャネルグループデータがありません</div>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
                         <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                             チャネルグループ
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                             セッション数
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                             トランザクション数
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                             売上
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                             コンバージョン率
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                             平均注文単価
                           </th>
                         </tr>
@@ -573,30 +580,30 @@ export default function Dashboard() {
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">売上上位商品 TOP10</h3>
                 {loading ? (
                   <div className="h-64 flex items-center justify-center">
-                    <div className="text-gray-500">読み込み中...</div>
+                    <div className="text-gray-900">読み込み中...</div>
                   </div>
                 ) : topProducts.length === 0 ? (
                   <div className="h-32 flex items-center justify-center">
-                    <div className="text-gray-500">商品データがありません</div>
+                    <div className="text-gray-900">商品データがありません</div>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
                         <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                             順位
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                             商品名
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                             売上
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                             購入数
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                             平均単価
                           </th>
                         </tr>

@@ -137,7 +137,7 @@ export default function PropertySelector({ onPropertySelected, selectedPropertyI
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
         <div className="bg-white p-8 rounded-lg shadow-md text-center max-w-md">
           <h1 className="text-2xl font-bold mb-4 text-red-600">プロパティ取得エラー</h1>
-          <p className="text-gray-600 mb-4">{error}</p>
+          <p className="text-gray-900 mb-4">{error}</p>
 
           {error.includes('Admin API') && (
             <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded mb-4 text-sm">
@@ -155,7 +155,7 @@ export default function PropertySelector({ onPropertySelected, selectedPropertyI
             </button>
 
             <div className="border-t pt-4">
-              <p className="text-sm text-gray-600 mb-3">または手動でプロパティIDを入力：</p>
+              <p className="text-sm text-gray-900 mb-3">または手動でプロパティIDを入力：</p>
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -199,7 +199,7 @@ export default function PropertySelector({ onPropertySelected, selectedPropertyI
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
         <div className="bg-white p-8 rounded-lg shadow-md text-center max-w-md">
           <h1 className="text-2xl font-bold mb-4">プロパティが見つかりません</h1>
-          <p className="text-gray-600 mb-6">
+          <p className="text-gray-900 mb-6">
             このGoogleアカウントに紐づいているGA4プロパティがありません。
             <br />
             Google Analyticsでプロパティが正しく設定されているか確認してください。
@@ -220,7 +220,7 @@ export default function PropertySelector({ onPropertySelected, selectedPropertyI
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
         <div className="bg-white p-8 rounded-lg shadow-md max-w-2xl w-full mx-4">
           <h1 className="text-2xl font-bold mb-4 text-center">GA4プロパティを選択</h1>
-          <p className="text-gray-600 mb-6 text-center">
+          <p className="text-gray-900 mb-6 text-center">
             分析したいGoogle Analytics 4プロパティを選択してください。
           </p>
 
@@ -234,16 +234,16 @@ export default function PropertySelector({ onPropertySelected, selectedPropertyI
                 <div className="flex items-start justify-between">
                   <div>
                     <h3 className="font-semibold text-gray-900">{property.name}</h3>
-                    <p className="text-sm text-gray-500">アカウント: {property.accountName}</p>
+                    <p className="text-sm text-gray-900">アカウント: {property.accountName}</p>
                     {property.websiteUrl && (
                       <div className="flex items-center mt-1">
-                        <Globe className="h-4 w-4 text-gray-400 mr-1" />
-                        <span className="text-sm text-gray-500">{property.websiteUrl}</span>
+                        <Globe className="h-4 w-4 text-gray-900 mr-1" />
+                        <span className="text-sm text-gray-900">{property.websiteUrl}</span>
                       </div>
                     )}
-                    <p className="text-xs text-gray-400 mt-1">プロパティID: {property.id}</p>
+                    <p className="text-xs text-gray-900 mt-1">プロパティID: {property.id}</p>
                   </div>
-                  <ChevronDown className="h-5 w-5 text-gray-400" />
+                  <ChevronDown className="h-5 w-5 text-gray-900" />
                 </div>
               </button>
             ))}
@@ -262,10 +262,10 @@ export default function PropertySelector({ onPropertySelected, selectedPropertyI
       >
         <div className="text-left">
           <div className="text-sm font-medium text-gray-900">{selectedProperty.name}</div>
-          <div className="text-xs text-gray-500">ID: {selectedProperty.id}</div>
+          <div className="text-xs text-gray-900">ID: {selectedProperty.id}</div>
           {isUpdating && <div className="text-xs text-blue-500">更新中...</div>}
         </div>
-        <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`h-4 w-4 text-gray-900 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {isOpen && (
@@ -279,8 +279,8 @@ export default function PropertySelector({ onPropertySelected, selectedPropertyI
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-sm font-medium text-gray-900">{property.name}</div>
-                  <div className="text-xs text-gray-500">ID: {property.id}</div>
-                  <div className="text-xs text-gray-400">{property.accountName}</div>
+                  <div className="text-xs text-gray-900">ID: {property.id}</div>
+                  <div className="text-xs text-gray-900">{property.accountName}</div>
                 </div>
                 {selectedProperty?.id === property.id && (
                   <Check className="h-4 w-4 text-blue-600" />
