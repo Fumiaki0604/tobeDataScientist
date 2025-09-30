@@ -325,6 +325,8 @@ export class DataProcessor {
       'transactions': 'トランザクション',
       'bounceRate': '直帰率',
       'sessionDuration': 'セッション継続時間',
+      'itemRevenue': '商品売上',
+      'itemsPurchased': '購入数',
     };
 
     return displayNames[metric] || metric;
@@ -337,13 +339,17 @@ export class DataProcessor {
       'pageTitle': 'ページタイトル',
       'sessionDefaultChannelGrouping': 'チャネル',
       'date': '日付',
+      'itemName': '商品',
+      'itemId': '商品ID',
+      'itemCategory': 'カテゴリ',
+      'itemBrand': 'ブランド',
     };
 
     return displayNames[dimension] || dimension;
   }
 
   private formatNumber(value: number, metric: string): string {
-    if (metric === 'totalRevenue') {
+    if (metric === 'totalRevenue' || metric === 'itemRevenue') {
       return `¥${Math.round(value).toLocaleString()}`;
     }
     if (metric === 'bounceRate') {

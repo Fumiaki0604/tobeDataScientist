@@ -190,22 +190,26 @@ JSONのみ返してください。説明は不要です。`;
 指定可能な値:
 - timeframe.type: "relative", "absolute", "named"
 - timeframe.period: "today", "yesterday", "last_week", "this_week", "last_month", "this_month", "last_7_days", "last_30_days", "9月", "8月", "10月"
-- metrics: "totalRevenue", "sessions", "screenPageViews", "activeUsers", "transactions"
-- dimensions: "deviceCategory", "pagePath", "pageTitle", "sessionDefaultChannelGrouping", "date", または空配列
+- metrics: "totalRevenue", "sessions", "screenPageViews", "activeUsers", "transactions", "itemRevenue", "itemsPurchased"
+- dimensions: "deviceCategory", "pagePath", "pageTitle", "sessionDefaultChannelGrouping", "date", "itemName", "itemId", "itemCategory", "itemBrand", または空配列
 - analysisType: "simple_query", "dimension_comparison", "ranking", "trend", "device_breakdown", "period_comparison", "forecast"
 - comparisonType: "dimension" (ディメンション間比較), "period" (期間比較), null (比較なし)
 - comparisonValues: 比較する値の配列 例: ["desktop", "mobile"], ["Organic Search", "Direct"], null
 
 ガイドライン:
-- 売上/収益/revenue/売り上げ → "totalRevenue"
+- 売上/収益/revenue/売り上げ → "totalRevenue" または "itemRevenue"（商品別の場合）
 - PV/ページビュー/閲覧/page view → "screenPageViews"
 - ユーザー/訪問者/user → "activeUsers"
 - セッション/session → "sessions"
 - 購入/トランザクション/コンバージョン → "transactions"
+- 購入数/販売数 → "itemsPurchased"
 - デバイス/device → dimensions: ["deviceCategory"]
 - ページ/page → dimensions: ["pagePath"]
 - チャネル/channel/流入元 → dimensions: ["sessionDefaultChannelGrouping"]
-- ランキング/順位/トップ → "ranking"
+- 商品/アイテム/product/item → dimensions: ["itemName"] + metrics: ["itemRevenue"] または ["itemsPurchased"]
+- ブランド → dimensions: ["itemBrand"]
+- カテゴリー → dimensions: ["itemCategory"]
+- ランキング/順位/トップ/一番 → analysisType: "ranking"
 - 推移/変化/トレンド → "trend"
 - 予測/予想/forecast → "forecast"
 - 期間比較（先月vs今月） → analysisType: "period_comparison", comparisonType: "period"
@@ -220,7 +224,14 @@ JSONのみ返してください。説明は不要です。`;
 - "今月のPV数の推移から今後7日間のPV数を予測" → analysisType: "forecast", dimensions: ["date"], timeframe: {"type": "relative", "period": "this_month"}
 - "先月のセッション数から今後の推移を予測" → analysisType: "forecast", dimensions: ["date"], timeframe: {"type": "relative", "period": "last_month"}
 
-重要: 予測分析(forecast)の場合は必ずdimensionsに["date"]を含めてください。
+商品の例:
+- "今月一番売れた商品は何？" → analysisType: "ranking", dimensions: ["itemName"], metrics: ["itemRevenue"]
+- "売上トップ10の商品を教えて" → analysisType: "ranking", dimensions: ["itemName"], metrics: ["itemRevenue"]
+- "購入数が多い商品ランキング" → analysisType: "ranking", dimensions: ["itemName"], metrics: ["itemsPurchased"]
+
+重要:
+- 予測分析(forecast)の場合は必ずdimensionsに["date"]を含めてください。
+- 商品に関する質問の場合はdimensionsに["itemName"]を含めてください。
 
 JSONのみ返してください。説明は不要です。`;
 
