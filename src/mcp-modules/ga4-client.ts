@@ -8,6 +8,7 @@ export const GA4FetchParamsSchema = z.object({
   metrics: z.array(z.string()),
   dimensions: z.array(z.string()).optional(),
   accessToken: z.string(),
+  limit: z.number().optional(),
 });
 
 export type GA4FetchParams = z.infer<typeof GA4FetchParamsSchema>;
@@ -26,7 +27,7 @@ export class GA4Client {
   async fetchAnalyticsData(params: GA4FetchParams): Promise<any> {
     console.log(`[GA4Client] Fetching data for property: ${params.propertyId}`);
 
-    const requestBody = {
+    const requestBody: any = {
       dateRanges: [
         {
           startDate: params.startDate,
@@ -36,6 +37,11 @@ export class GA4Client {
       dimensions: params.dimensions?.map(name => ({ name })) || [],
       metrics: params.metrics.map(name => ({ name })),
     };
+
+    // limitが指定されている場合は追加
+    if (params.limit) {
+      requestBody.limit = params.limit;
+    }
 
     console.log(`[GA4Client] Request body:`, JSON.stringify(requestBody, null, 2));
 

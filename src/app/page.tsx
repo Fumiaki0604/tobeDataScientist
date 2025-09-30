@@ -101,16 +101,15 @@ export default function Dashboard() {
         setChannelGroupData(sortedChannelData)
       }
 
-      // 商品別売上TOP10の取得
-      const productsResponse = await fetch(`/api/analytics?startDate=${dateRange}&endDate=today&metrics=itemRevenue,itemsPurchased&dimensions=itemName&propertyId=${propertyId}`)
+      // 商品別売上TOP10の取得（limit=10で最適化）
+      const productsResponse = await fetch(`/api/analytics?startDate=${dateRange}&endDate=today&metrics=itemRevenue,itemsPurchased&dimensions=itemName&propertyId=${propertyId}&limit=10`)
 
       if (productsResponse.ok) {
         const productsResult = await productsResponse.json()
-        // 売上で降順ソートしてTOP10を取得
+        // 売上で降順ソート（GA4 APIがlimitを適用するがソートが必要な場合もある）
         const sortedProducts = (productsResult.data || [])
           .filter((item: TopProductItem) => item.itemName && item.itemRevenue > 0)
           .sort((a: TopProductItem, b: TopProductItem) => b.itemRevenue - a.itemRevenue)
-          .slice(0, 10)
         setTopProducts(sortedProducts)
       }
     } catch (err) {

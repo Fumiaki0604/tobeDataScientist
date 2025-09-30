@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get('endDate') || 'today'
     const metrics = searchParams.get('metrics') || 'activeUsers,sessions,screenPageViews'
     const dimensions = searchParams.get('dimensions') || 'date'
+    const limit = searchParams.get('limit')
 
     // プロパティIDをパラメータから取得（優先）、またはストレージから取得
     let propertyId = searchParams.get('propertyId')
@@ -48,7 +49,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Google Analytics Data API REST APIを直接呼び出し
-    const requestBody = {
+    const requestBody: any = {
       property: `properties/${propertyId}`,
       dateRanges: [
         {
@@ -58,6 +59,11 @@ export async function GET(request: NextRequest) {
       ],
       dimensions: dimensions.split(',').map(dim => ({ name: dim.trim() })),
       metrics: metrics.split(',').map(metric => ({ name: metric.trim() })),
+    }
+
+    // limitが指定されている場合は追加
+    if (limit) {
+      requestBody.limit = parseInt(limit, 10)
     }
 
     console.log('Analytics API Request:', {
