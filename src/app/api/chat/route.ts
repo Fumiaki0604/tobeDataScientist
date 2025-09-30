@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../auth/[...nextauth]/route'
-import { getMCPClient } from '../../../lib/mcp-client'
+import { QueryAnalyzer } from '../../../mcp-modules/query-analyzer'
+import { GA4Client } from '../../../mcp-modules/ga4-client'
+import { DataProcessor } from '../../../mcp-modules/data-processor'
 
 export async function POST(request: NextRequest) {
   try {
@@ -37,17 +39,15 @@ export async function POST(request: NextRequest) {
       }, { status: 500 })
     }
 
-    const mcpClient = getMCPClient(apiKey)
+    // モジュールを直接初期化
+    const queryAnalyzer = new QueryAnalyzer(apiKey)
+    const ga4Client = new GA4Client()
+    const dataProcessor = new DataProcessor()
 
     try {
-      // Step 1: MCPサーバーで質問を解析
-      console.log('📊 Analyzing query with MCP server...')
-      const analysisResult = await mcpClient.callTool('analyze_ga4_query', {
-        question,
-        propertyId,
-      })
-
-      const analysisConfig = JSON.parse(analysisResult.content[0].text)
+      // Step 1: 質問を解析
+      console.log('📊 Analyzing query...')
+      const analysisConfig = await queryAnalyzer.analyzeQuery(question, propertyId)
       console.log('📋 Analysis config:', analysisConfig)
 
       // Step 2: QueryAnalyzerから日付範囲を計算
@@ -56,22 +56,18 @@ export async function POST(request: NextRequest) {
       if (analysisConfig.analysisType === 'period_comparison') {
         // 期間比較の場合、LLMで質問から2つの期間を抽出
         console.log('📅 Extracting comparison periods with LLM...')
-        const periodsResult = await mcpClient.callTool('extract_comparison_periods', { question })
-        const periods = JSON.parse(periodsResult.content[0].text)
+        const periods = await queryAnalyzer.extractComparisonPeriods(question)
         console.log('📅 Comparison periods:', periods)
 
         // 各期間の日付範囲を計算
-        const dateRange1Result = await mcpClient.callTool('calculate_date_range_from_period', { period: periods.period1 })
-        const dateRange1 = JSON.parse(dateRange1Result.content[0].text)
-
-        const dateRange2Result = await mcpClient.callTool('calculate_date_range_from_period', { period: periods.period2 })
-        const dateRange2 = JSON.parse(dateRange2Result.content[0].text)
+        const dateRange1 = queryAnalyzer.calculateDateRangeFromPeriod(periods.period1)
+        const dateRange2 = queryAnalyzer.calculateDateRangeFromPeriod(periods.period2)
 
         console.log('📅 Period 1 dates:', dateRange1)
         console.log('📅 Period 2 dates:', dateRange2)
 
         // 2つの期間のデータを取得
-        const period1Data = await mcpClient.callTool('fetch_ga4_data', {
+        const period1Data = await ga4Client.fetchAnalyticsData({
           propertyId,
           startDate: dateRange1.startDate,
           endDate: dateRange1.endDate,
@@ -80,7 +76,7 @@ export async function POST(request: NextRequest) {
           accessToken: session.accessToken,
         })
 
-        const period2Data = await mcpClient.callTool('fetch_ga4_data', {
+        const period2Data = await ga4Client.fetchAnalyticsData({
           propertyId,
           startDate: dateRange2.startDate,
           endDate: dateRange2.endDate,
@@ -92,11 +88,11 @@ export async function POST(request: NextRequest) {
         ga4Data = {
           period1: {
             label: periods.period1.label,
-            data: JSON.parse(period1Data.content[0].text)
+            data: period1Data
           },
           period2: {
             label: periods.period2.label,
-            data: JSON.parse(period2Data.content[0].text)
+            data: period2Data
           }
         }
         console.log('✅ Comparison data retrieved')
@@ -106,7 +102,7 @@ export async function POST(request: NextRequest) {
         console.log('📅 Date range:', { startDate, endDate })
 
         console.log('📈 Fetching GA4 data...')
-        const ga4DataResult = await mcpClient.callTool('fetch_ga4_data', {
+        ga4Data = await ga4Client.fetchAnalyticsData({
           propertyId,
           startDate,
           endDate,
@@ -115,19 +111,16 @@ export async function POST(request: NextRequest) {
           accessToken: session.accessToken,
         })
 
-        ga4Data = JSON.parse(ga4DataResult.content[0].text)
         console.log('✅ GA4 data retrieved, rows:', ga4Data.length)
       }
 
-      // Step 4: MCPサーバーでデータを処理・分析
-      console.log('🧠 Processing data with MCP server...')
-      const processResult = await mcpClient.callTool('process_ga4_data', {
-        data: ga4Data,
+      // Step 4: データを処理・分析
+      console.log('🧠 Processing data...')
+      const finalAnswer = await dataProcessor.processData(
+        ga4Data,
         question,
-        analysisType: analysisConfig.analysisType,
-      })
-
-      const finalAnswer = processResult.content[0].text
+        analysisConfig.analysisType
+      )
       console.log('💬 Final answer generated')
 
       return NextResponse.json({
@@ -135,17 +128,17 @@ export async function POST(request: NextRequest) {
         response: finalAnswer,
         dataUsed: true,
         analysisConfig,
-        dataPoints: ga4Data.length,
+        dataPoints: Array.isArray(ga4Data) ? ga4Data.length : 0,
       })
 
-    } catch (mcpError) {
-      console.error('❌ MCP Server Error:', mcpError)
+    } catch (analysisError) {
+      console.error('❌ Analysis Error:', analysisError)
 
-      // MCPサーバーでエラーが発生した場合のフォールバック
+      // 分析でエラーが発生した場合のフォールバック
       return NextResponse.json({
         success: false,
         response: 'データの分析中にエラーが発生しました。しばらくしてからもう一度お試しください。',
-        error: mcpError instanceof Error ? mcpError.message : 'Unknown MCP error',
+        error: analysisError instanceof Error ? analysisError.message : 'Unknown analysis error',
       })
     }
 
