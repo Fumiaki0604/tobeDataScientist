@@ -10,7 +10,7 @@ export const AnalysisConfigSchema = z.object({
   }),
   metrics: z.array(z.string()),
   dimensions: z.array(z.string()),
-  analysisType: z.enum(['simple_query', 'comparison', 'ranking', 'trend', 'device_breakdown']),
+  analysisType: z.enum(['simple_query', 'comparison', 'ranking', 'trend', 'device_breakdown', 'period_comparison']),
   filters: z.array(z.any()).optional(),
 });
 
@@ -35,6 +35,7 @@ export class QueryAnalyzer {
   // メトリクスのキーワードパターン
   private metricPatterns = {
     '売上': ['totalRevenue'],
+    '売り上げ': ['totalRevenue'],
     '収益': ['totalRevenue'],
     'revenue': ['totalRevenue'],
     'PV': ['screenPageViews'],
@@ -138,6 +139,14 @@ export class QueryAnalyzer {
 
   private determineAnalysisType(question: string): AnalysisConfig['analysisType'] {
     const lowerQuestion = question.toLowerCase();
+
+    // 期間比較の検出（先月vs今月、先週vs今週など）
+    if ((lowerQuestion.includes('比較') || lowerQuestion.includes('vs') || lowerQuestion.includes('対')) &&
+        (lowerQuestion.includes('先月') && lowerQuestion.includes('今月') ||
+         lowerQuestion.includes('先週') && lowerQuestion.includes('今週') ||
+         lowerQuestion.includes('去年') && lowerQuestion.includes('今年'))) {
+      return 'period_comparison';
+    }
 
     if (lowerQuestion.includes('比較') || lowerQuestion.includes('vs') || lowerQuestion.includes('対')) {
       return 'comparison';

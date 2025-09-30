@@ -30,6 +30,9 @@ export class DataProcessor {
       case 'device_breakdown':
         return this.processDeviceBreakdown(data, question);
 
+      case 'period_comparison':
+        return this.processPeriodComparison(data, question);
+
       default:
         return this.processSimpleQuery(data, question);
     }
@@ -510,5 +513,41 @@ export class DataProcessor {
     }
 
     return trendResult + '\n\n予測: データ不足のため予測できません（3日以上のデータが必要）';
+  }
+
+  // 期間比較処理（先月vs今月など）
+  private processPeriodComparison(data: any[], question: string): string {
+    // 注意: 現在のデータは1期間分のみ
+    // 本来は2期間分のデータが必要だが、現在のアーキテクチャでは1回のAPI呼び出しのみ
+    // 暫定対応として、取得できたデータで可能な限りの分析を提供
+
+    const firstItem = data[0];
+    const metrics = Object.keys(firstItem).filter(key => typeof firstItem[key] === 'number');
+    const relevantMetric = this.selectRelevantMetric(question, metrics);
+
+    const currentPeriodValue = data.reduce((sum, item) => sum + (item[relevantMetric] || 0), 0);
+    const metricDisplayName = this.getMetricDisplayName(relevantMetric);
+    const formattedValue = this.formatNumber(currentPeriodValue, relevantMetric);
+
+    // 期間を特定
+    let periodName = '指定期間';
+    if (question.includes('先月')) {
+      periodName = '先月';
+    } else if (question.includes('今月')) {
+      periodName = '今月';
+    } else if (question.includes('先週')) {
+      periodName = '先週';
+    } else if (question.includes('今週')) {
+      periodName = '今週';
+    }
+
+    return `${periodName}の${metricDisplayName}: ${formattedValue}
+
+⚠️ 注意: 現在は${periodName}のデータのみ取得しています。
+完全な期間比較を行うには、両方の期間のデータが必要です。
+
+改善案:
+- 「先月の売上は？」と「今月の売上は？」を別々に質問してください
+- または、期間比較機能の拡張をお待ちください`;
   }
 }
