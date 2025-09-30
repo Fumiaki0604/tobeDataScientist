@@ -51,23 +51,62 @@ export async function POST(request: NextRequest) {
       console.log('📋 Analysis config:', analysisConfig)
 
       // Step 2: QueryAnalyzerから日付範囲を計算
-      // この部分は簡略化のため、MCPサーバー内で計算した日付を使用
-      const { startDate, endDate } = calculateDateRangeFromConfig(analysisConfig.timeframe)
-      console.log('📅 Date range:', { startDate, endDate })
+      let ga4Data: any;
 
-      // Step 3: MCPサーバーでGA4データを取得
-      console.log('📈 Fetching GA4 data...')
-      const ga4DataResult = await mcpClient.callTool('fetch_ga4_data', {
-        propertyId,
-        startDate,
-        endDate,
-        metrics: analysisConfig.metrics,
-        dimensions: analysisConfig.dimensions,
-        accessToken: session.accessToken,
-      })
+      if (analysisConfig.analysisType === 'period_comparison') {
+        // 期間比較の場合、質問から2つの期間を抽出
+        console.log('📅 Extracting comparison periods...')
+        const periods = extractComparisonPeriods(question)
+        console.log('📅 Comparison periods:', periods)
 
-      const ga4Data = JSON.parse(ga4DataResult.content[0].text)
-      console.log('✅ GA4 data retrieved, rows:', ga4Data.length)
+        // 2つの期間のデータを取得
+        const period1Data = await mcpClient.callTool('fetch_ga4_data', {
+          propertyId,
+          startDate: periods.period1.startDate,
+          endDate: periods.period1.endDate,
+          metrics: analysisConfig.metrics,
+          dimensions: analysisConfig.dimensions,
+          accessToken: session.accessToken,
+        })
+
+        const period2Data = await mcpClient.callTool('fetch_ga4_data', {
+          propertyId,
+          startDate: periods.period2.startDate,
+          endDate: periods.period2.endDate,
+          metrics: analysisConfig.metrics,
+          dimensions: analysisConfig.dimensions,
+          accessToken: session.accessToken,
+        })
+
+        ga4Data = {
+          period1: {
+            label: periods.period1.label,
+            data: JSON.parse(period1Data.content[0].text)
+          },
+          period2: {
+            label: periods.period2.label,
+            data: JSON.parse(period2Data.content[0].text)
+          }
+        }
+        console.log('✅ Comparison data retrieved')
+      } else {
+        // 通常の分析の場合
+        const { startDate, endDate } = calculateDateRangeFromConfig(analysisConfig.timeframe)
+        console.log('📅 Date range:', { startDate, endDate })
+
+        console.log('📈 Fetching GA4 data...')
+        const ga4DataResult = await mcpClient.callTool('fetch_ga4_data', {
+          propertyId,
+          startDate,
+          endDate,
+          metrics: analysisConfig.metrics,
+          dimensions: analysisConfig.dimensions,
+          accessToken: session.accessToken,
+        })
+
+        ga4Data = JSON.parse(ga4DataResult.content[0].text)
+        console.log('✅ GA4 data retrieved, rows:', ga4Data.length)
+      }
 
       // Step 4: MCPサーバーでデータを処理・分析
       console.log('🧠 Processing data with MCP server...')
@@ -106,6 +145,73 @@ export async function POST(request: NextRequest) {
       response: 'システムエラーが発生しました。',
       error: error instanceof Error ? error.message : 'Unknown error',
     }, { status: 500 })
+  }
+}
+
+// 期間比較のための2つの期間を抽出
+function extractComparisonPeriods(question: string) {
+  const today = new Date()
+
+  // 先月 vs 今月
+  if (question.includes('先月') && question.includes('今月')) {
+    const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1)
+    const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1)
+    const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0)
+
+    return {
+      period1: {
+        label: '先月',
+        startDate: formatDate(lastMonthStart),
+        endDate: formatDate(lastMonthEnd)
+      },
+      period2: {
+        label: '今月',
+        startDate: formatDate(thisMonthStart),
+        endDate: formatDate(today)
+      }
+    }
+  }
+
+  // 先週 vs 今週
+  if (question.includes('先週') && question.includes('今週')) {
+    const thisWeekStart = new Date(today)
+    thisWeekStart.setDate(today.getDate() - today.getDay())
+
+    const lastWeekEnd = new Date(today)
+    lastWeekEnd.setDate(today.getDate() - today.getDay() - 1)
+    const lastWeekStart = new Date(lastWeekEnd)
+    lastWeekStart.setDate(lastWeekEnd.getDate() - 6)
+
+    return {
+      period1: {
+        label: '先週',
+        startDate: formatDate(lastWeekStart),
+        endDate: formatDate(lastWeekEnd)
+      },
+      period2: {
+        label: '今週',
+        startDate: formatDate(thisWeekStart),
+        endDate: formatDate(today)
+      }
+    }
+  }
+
+  // デフォルト: 先月 vs 今月
+  const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1)
+  const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1)
+  const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0)
+
+  return {
+    period1: {
+      label: '先月',
+      startDate: formatDate(lastMonthStart),
+      endDate: formatDate(lastMonthEnd)
+    },
+    period2: {
+      label: '今月',
+      startDate: formatDate(thisMonthStart),
+      endDate: formatDate(today)
+    }
   }
 }
 

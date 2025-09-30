@@ -1,11 +1,18 @@
 export class DataProcessor {
-  async processData(data: any[], question: string, analysisType: string): Promise<string> {
+  async processData(data: any, question: string, analysisType: string): Promise<string> {
     console.log(`[DataProcessor] Processing ${analysisType} analysis for: "${question}"`);
-    console.log(`[DataProcessor] Data points: ${data.length}`);
 
-    if (!data || data.length === 0) {
+    // 期間比較の場合、データ構造が異なる
+    if (analysisType === 'period_comparison' && data.period1 && data.period2) {
+      return this.processPeriodComparison(data, question);
+    }
+
+    // 通常のデータ配列の場合
+    if (!Array.isArray(data) || data.length === 0) {
       return 'データが見つかりませんでした。';
     }
+
+    console.log(`[DataProcessor] Data points: ${data.length}`);
 
     // 複合パターンの検出と処理
     const compositePattern = this.detectCompositePattern(question, analysisType);
@@ -29,9 +36,6 @@ export class DataProcessor {
 
       case 'device_breakdown':
         return this.processDeviceBreakdown(data, question);
-
-      case 'period_comparison':
-        return this.processPeriodComparison(data, question);
 
       default:
         return this.processSimpleQuery(data, question);
@@ -516,38 +520,29 @@ export class DataProcessor {
   }
 
   // 期間比較処理（先月vs今月など）
-  private processPeriodComparison(data: any[], question: string): string {
-    // 注意: 現在のデータは1期間分のみ
-    // 本来は2期間分のデータが必要だが、現在のアーキテクチャでは1回のAPI呼び出しのみ
-    // 暫定対応として、取得できたデータで可能な限りの分析を提供
+  private processPeriodComparison(data: any, question: string): string {
+    const period1Data = data.period1.data;
+    const period2Data = data.period2.data;
 
-    const firstItem = data[0];
+    // メトリクスを取得
+    const firstItem = period1Data[0];
     const metrics = Object.keys(firstItem).filter(key => typeof firstItem[key] === 'number');
     const relevantMetric = this.selectRelevantMetric(question, metrics);
 
-    const currentPeriodValue = data.reduce((sum, item) => sum + (item[relevantMetric] || 0), 0);
+    // 各期間の合計値を計算
+    const period1Value = period1Data.reduce((sum: number, item: any) => sum + (item[relevantMetric] || 0), 0);
+    const period2Value = period2Data.reduce((sum: number, item: any) => sum + (item[relevantMetric] || 0), 0);
+
+    // 変化率を計算
+    const change = period2Value - period1Value;
+    const changeRate = period1Value > 0 ? ((change / period1Value) * 100).toFixed(1) : '0.0';
+    const changeSymbol = change > 0 ? '📈' : change < 0 ? '📉' : '➡️';
+
     const metricDisplayName = this.getMetricDisplayName(relevantMetric);
-    const formattedValue = this.formatNumber(currentPeriodValue, relevantMetric);
 
-    // 期間を特定
-    let periodName = '指定期間';
-    if (question.includes('先月')) {
-      periodName = '先月';
-    } else if (question.includes('今月')) {
-      periodName = '今月';
-    } else if (question.includes('先週')) {
-      periodName = '先週';
-    } else if (question.includes('今週')) {
-      periodName = '今週';
-    }
+    return `${data.period1.label}の${metricDisplayName}: ${this.formatNumber(period1Value, relevantMetric)}
+${data.period2.label}の${metricDisplayName}: ${this.formatNumber(period2Value, relevantMetric)}
 
-    return `${periodName}の${metricDisplayName}: ${formattedValue}
-
-⚠️ 注意: 現在は${periodName}のデータのみ取得しています。
-完全な期間比較を行うには、両方の期間のデータが必要です。
-
-改善案:
-- 「先月の売上は？」と「今月の売上は？」を別々に質問してください
-- または、期間比較機能の拡張をお待ちください`;
+${changeSymbol} 変化: ${this.formatNumber(Math.abs(change), relevantMetric)} (${changeRate > '0' ? '+' : ''}${changeRate}%)`;
   }
 }
