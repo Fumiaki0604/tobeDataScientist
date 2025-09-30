@@ -243,20 +243,21 @@ export default function Dashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-8">
-        {activeTab === 'chat' ? (
-          <div>
-            <ChatInterface propertyId={propertyId} />
-          </div>
-        ) : (
-          <div>
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-6">
-                {error}
-              </div>
-            )}
+        {/* チャットタブ */}
+        <div className={activeTab === 'chat' ? '' : 'hidden'}>
+          <ChatInterface propertyId={propertyId} />
+        </div>
 
-            {/* 期間選択 */}
-            <div className="mb-6 flex justify-between items-center">
+        {/* ダッシュボードタブ */}
+        <div className={activeTab === 'dashboard' ? '' : 'hidden'}>
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-6">
+              {error}
+            </div>
+          )}
+
+          {/* 期間選択 */}
+          <div className="mb-6 flex justify-between items-center">
               <h2 className="text-xl font-semibold text-gray-900">データダッシュボード</h2>
               <select
                 value={dateRange}
@@ -638,8 +639,7 @@ export default function Dashboard() {
                 )}
               </div>
             </div>
-          </div>
-        )}
+        </div>
       </main>
     </div>
   )
