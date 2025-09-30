@@ -83,12 +83,12 @@ export class QueryAnalyzer {
     }
   };
 
-  async analyzeQuery(question: string, propertyId: string): Promise<AnalysisConfig> {
+  async analyzeQuery(question: string, propertyId: string, conversationHistory?: any[]): Promise<AnalysisConfig> {
     console.log(`[QueryAnalyzer] Analyzing: "${question}"`);
 
     // 完全LLMベースの分析
     console.log(`[QueryAnalyzer] 🤖 Using LLM analysis...`);
-    return await this.llmAnalyze(question);
+    return await this.llmAnalyze(question, conversationHistory);
   }
 
   // 期間比較用に2つの期間を抽出
@@ -172,7 +172,7 @@ JSONのみ返してください。説明は不要です。`;
     return config;
   }
 
-  private async llmAnalyze(question: string): Promise<AnalysisConfig> {
+  private async llmAnalyze(question: string, conversationHistory?: any[]): Promise<AnalysisConfig> {
     const prompt = `GA4分析質問を解析してJSONで回答してください：
 
 質問: "${question}"
@@ -236,7 +236,7 @@ JSONのみ返してください。説明は不要です。`;
 JSONのみ返してください。説明は不要です。`;
 
     try {
-      const response = await this.callOpenAI(prompt);
+      const response = await this.callOpenAI(prompt, conversationHistory);
       console.log(`[QueryAnalyzer] 🤖 LLM response:`, response);
 
       // ```json ``` ブロックを除去
@@ -264,7 +264,30 @@ JSONのみ返してください。説明は不要です。`;
     }
   }
 
-  private async callOpenAI(prompt: string): Promise<string> {
+  private async callOpenAI(prompt: string, conversationHistory?: any[]): Promise<string> {
+    // 会話履歴を含むメッセージ配列を構築
+    const messages: any[] = [];
+
+    // 会話履歴がある場合は追加（コンテキストとして）
+    if (conversationHistory && conversationHistory.length > 0) {
+      messages.push({
+        role: 'system',
+        content: '以下はユーザーとアシスタントの過去の会話履歴です。この文脈を踏まえて質問を解釈してください。'
+      });
+      conversationHistory.forEach((msg: any) => {
+        messages.push({
+          role: msg.role,
+          content: msg.content
+        });
+      });
+    }
+
+    // 現在のプロンプトを追加
+    messages.push({
+      role: 'user',
+      content: prompt
+    });
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -273,12 +296,7 @@ JSONのみ返してください。説明は不要です。`;
       },
       body: JSON.stringify({
         model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
+        messages,
         max_tokens: 300,
       }),
     });

@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
       }, { status: 401 })
     }
 
-    const { question, propertyId } = await request.json()
+    const { question, propertyId, conversationHistory } = await request.json()
 
     if (!question || !propertyId) {
       return NextResponse.json({
@@ -45,9 +45,12 @@ export async function POST(request: NextRequest) {
     const dataProcessor = new DataProcessor()
 
     try {
-      // Step 1: 質問を解析
+      // Step 1: 質問を解析（会話履歴を含む）
       console.log('📊 Analyzing query...')
-      const analysisConfig = await queryAnalyzer.analyzeQuery(question, propertyId)
+      if (conversationHistory && conversationHistory.length > 0) {
+        console.log('💬 Conversation history:', conversationHistory.length, 'messages')
+      }
+      const analysisConfig = await queryAnalyzer.analyzeQuery(question, propertyId, conversationHistory)
       console.log('📋 Analysis config:', analysisConfig)
 
       // Step 2: QueryAnalyzerから日付範囲を計算

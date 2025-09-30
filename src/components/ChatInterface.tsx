@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Send, Bot, User, Loader2 } from 'lucide-react'
 
 interface Message {
@@ -25,6 +25,23 @@ export default function ChatInterface({ propertyId }: ChatInterfaceProps) {
   ])
   const [inputMessage, setInputMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const previousPropertyIdRef = useRef<string>(propertyId)
+
+  // プロパティIDが変更されたときのみ履歴をクリア
+  useEffect(() => {
+    if (previousPropertyIdRef.current !== propertyId) {
+      console.log(`Property changed from ${previousPropertyIdRef.current} to ${propertyId}, clearing chat history`)
+      setMessages([
+        {
+          id: '1',
+          role: 'assistant',
+          content: 'こんにちは！Google Analytics 4の分析についてお聞きください。「昨日と今日のPV数を比較してください」のような質問をお待ちしています。',
+          timestamp: new Date()
+        }
+      ])
+      previousPropertyIdRef.current = propertyId
+    }
+  }, [propertyId])
 
   const sendMessage = async () => {
     if (!inputMessage.trim() || isLoading) return
@@ -41,6 +58,14 @@ export default function ChatInterface({ propertyId }: ChatInterfaceProps) {
     setIsLoading(true)
 
     try {
+      // 会話履歴を含めて送信（最初のウェルカムメッセージは除く）
+      const conversationHistory = messages
+        .filter(msg => msg.id !== '1') // ウェルカムメッセージを除外
+        .map(msg => ({
+          role: msg.role,
+          content: msg.content
+        }))
+
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
@@ -48,7 +73,8 @@ export default function ChatInterface({ propertyId }: ChatInterfaceProps) {
         },
         body: JSON.stringify({
           question: userMessage.content,
-          propertyId: propertyId
+          propertyId: propertyId,
+          conversationHistory: conversationHistory
         }),
       })
 
