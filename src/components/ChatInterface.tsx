@@ -67,11 +67,18 @@ export default function ChatInterface({ propertyId }: ChatInterfaceProps) {
 
       setMessages(prev => [...prev, assistantMessage])
 
-    } catch {
+    } catch (error: any) {
+      let errorContent = 'すみません、分析中にエラーが発生しました。もう一度試してください。'
+
+      // 認証エラーの場合
+      if (error?.status === 401 || error?.needsReauth) {
+        errorContent = '認証の有効期限が切れました。ページを更新してもう一度ログインしてください。'
+      }
+
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: 'すみません、分析中にエラーが発生しました。もう一度試してください。',
+        content: errorContent,
         timestamp: new Date()
       }
 

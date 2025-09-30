@@ -11,6 +11,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // セッションにエラーがある場合（トークンリフレッシュに失敗した場合など）
+    if (session.error === 'RefreshAccessTokenError') {
+      return NextResponse.json({
+        error: 'Authentication session expired. Please sign in again.',
+        needsReauth: true
+      }, { status: 401 })
+    }
+
     const { question, propertyId } = await request.json()
 
     if (!question || !propertyId) {
