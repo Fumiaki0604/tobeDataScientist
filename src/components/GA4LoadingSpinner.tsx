@@ -1,8 +1,8 @@
 export default function GA4LoadingSpinner() {
-  const text = 'GA4プロパティを読み込んでいます'
+  const animatedText = ['G', 'N', 'I', 'D', 'A', 'O', 'L']
 
   return (
-    <div className="fixed inset-0 bg-gray-50 flex flex-col items-center justify-center z-50 gap-12">
+    <div className="fixed inset-0 bg-gray-50 flex flex-col items-center justify-center z-50 gap-8">
       <svg
         version="1.1"
         xmlns="http://www.w3.org/2000/svg"
@@ -65,12 +65,15 @@ export default function GA4LoadingSpinner() {
         />
       </svg>
 
-      {/* アニメーションテキスト */}
+      {/* 固定テキスト */}
+      <p className="text-lg text-gray-900 font-medium">GA4プロパティを読み込んでいます</p>
+
+      {/* LOADINGアニメーション */}
       <div className="relative w-[600px] h-[36px] overflow-visible select-none">
-        {text.split('').reverse().map((char, index) => (
+        {animatedText.map((char, index) => (
           <div
             key={index}
-            className="absolute w-[20px] h-[36px] opacity-0 font-sans text-black text-2xl"
+            className="absolute w-[20px] h-[36px] opacity-0 font-sans text-black text-2xl font-bold"
             style={{
               animation: 'textMove 2s linear infinite',
               animationDelay: `${index * 0.2}s`,
