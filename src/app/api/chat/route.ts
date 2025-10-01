@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../auth/[...nextauth]/route'
-import { QueryAnalyzer } from '../../../mcp-modules/query-analyzer'
 import { GA4Client } from '../../../mcp-modules/ga4-client'
-import { DataProcessor } from '../../../mcp-modules/data-processor'
 
 export async function POST(request: NextRequest) {
   try {
@@ -39,105 +37,154 @@ export async function POST(request: NextRequest) {
       }, { status: 500 })
     }
 
-    // モジュールを直接初期化
-    const queryAnalyzer = new QueryAnalyzer(apiKey)
     const ga4Client = new GA4Client()
-    const dataProcessor = new DataProcessor()
 
-    try {
-      // Step 1: 質問を解析（会話履歴を含む）
-      console.log('📊 Analyzing query...')
-      if (conversationHistory && conversationHistory.length > 0) {
-        console.log('💬 Conversation history:', conversationHistory.length, 'messages')
-      }
-      const analysisConfig = await queryAnalyzer.analyzeQuery(question, propertyId, conversationHistory)
-      console.log('📋 Analysis config:', analysisConfig)
-
-      // Step 2: QueryAnalyzerから日付範囲を計算
-      let ga4Data: any;
-
-      if (analysisConfig.analysisType === 'period_comparison') {
-        // 期間比較の場合、LLMで質問から2つの期間を抽出
-        console.log('📅 Extracting comparison periods with LLM...')
-        const periods = await queryAnalyzer.extractComparisonPeriods(question)
-        console.log('📅 Comparison periods:', periods)
-
-        // 各期間の日付範囲を計算
-        const dateRange1 = queryAnalyzer.calculateDateRangeFromPeriod(periods.period1)
-        const dateRange2 = queryAnalyzer.calculateDateRangeFromPeriod(periods.period2)
-
-        console.log('📅 Period 1 dates:', dateRange1)
-        console.log('📅 Period 2 dates:', dateRange2)
-
-        // 2つの期間のデータを取得
-        const period1Data = await ga4Client.fetchAnalyticsData({
-          propertyId,
-          startDate: dateRange1.startDate,
-          endDate: dateRange1.endDate,
-          metrics: analysisConfig.metrics,
-          dimensions: analysisConfig.dimensions,
-          accessToken: session.accessToken,
-        })
-
-        const period2Data = await ga4Client.fetchAnalyticsData({
-          propertyId,
-          startDate: dateRange2.startDate,
-          endDate: dateRange2.endDate,
-          metrics: analysisConfig.metrics,
-          dimensions: analysisConfig.dimensions,
-          accessToken: session.accessToken,
-        })
-
-        ga4Data = {
-          period1: {
-            label: periods.period1.label,
-            data: period1Data
-          },
-          period2: {
-            label: periods.period2.label,
-            data: period2Data
+    // OpenAI Function Calling用のツール定義
+    const tools = [
+      {
+        type: 'function',
+        function: {
+          name: 'fetch_ga4_data',
+          description: 'Google Analytics 4 (GA4) からデータを取得します。ユーザーの質問に基づいて適切なメトリクス、ディメンション、日付範囲を指定してください。',
+          parameters: {
+            type: 'object',
+            properties: {
+              startDate: {
+                type: 'string',
+                description: '開始日 (YYYY-MM-DD形式)。例: 2025-09-27'
+              },
+              endDate: {
+                type: 'string',
+                description: '終了日 (YYYY-MM-DD形式)。例: 2025-09-27'
+              },
+              metrics: {
+                type: 'array',
+                items: { type: 'string' },
+                description: '取得するメトリクス。利用可能: totalRevenue(総収益), itemRevenue(商品売上), screenPageViews(PV), activeUsers(ユーザー数), sessions(セッション数), transactions(トランザクション数), itemsViewed(商品閲覧数), itemsPurchased(購入商品数)'
+              },
+              dimensions: {
+                type: 'array',
+                items: { type: 'string' },
+                description: '取得するディメンション。利用可能: date(日付), itemName(商品名), deviceCategory(デバイス), pagePath(ページパス), pageTitle(ページタイトル), sessionSource(ソース), sessionDefaultChannelGrouping(チャネル), itemCategory(商品カテゴリ)'
+              }
+            },
+            required: ['startDate', 'endDate', 'metrics']
           }
         }
-        console.log('✅ Comparison data retrieved')
-      } else {
-        // 通常の分析の場合
-        const { startDate, endDate } = calculateDateRangeFromConfig(analysisConfig.timeframe)
-        console.log('📅 Date range:', { startDate, endDate })
+      }
+    ]
 
-        console.log('📈 Fetching GA4 data...')
-        ga4Data = await ga4Client.fetchAnalyticsData({
-          propertyId,
-          startDate,
-          endDate,
-          metrics: analysisConfig.metrics,
-          dimensions: analysisConfig.dimensions,
-          accessToken: session.accessToken,
-        })
+    try {
+      // OpenAIにFunction Callingで質問を送信
+      console.log('🤖 Sending question to OpenAI with Function Calling...')
 
-        console.log('✅ GA4 data retrieved, rows:', ga4Data.length)
+      const messages = [
+        {
+          role: 'system',
+          content: `あなたはGoogle Analytics 4のデータ分析アシスタントです。ユーザーの質問に基づいて、適切なGA4データを取得し、分析結果を日本語で回答してください。
+
+今日の日付: ${new Date().toISOString().split('T')[0]}
+
+重要な注意事項:
+- 「9/27」「9月27日」など特定の日付が指定された場合、その日のみのデータを取得してください（startDateとendDateを同じ日付に）
+- 「先週」「今月」など相対的な期間は、今日の日付を基準に計算してください
+- 商品の売上やランキングを聞かれた場合は、metrics=['itemRevenue'], dimensions=['itemName']を使用してください
+- デバイス別の分析にはdimensions=['deviceCategory']を使用してください
+- 日別の推移にはdimensions=['date']を使用してください`
+        }
+      ]
+
+      // 会話履歴を追加
+      if (conversationHistory && conversationHistory.length > 0) {
+        messages.push(...conversationHistory)
       }
 
-      // Step 4: データを処理・分析
-      console.log('🧠 Processing data...')
-      const finalAnswer = await dataProcessor.processData(
-        ga4Data,
-        question,
-        analysisConfig.analysisType
-      )
-      console.log('💬 Final answer generated')
+      // ユーザーの質問を追加
+      messages.push({
+        role: 'user',
+        content: question
+      })
 
+      let response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages,
+          tools,
+          tool_choice: 'auto'
+        })
+      })
+
+      let result = await response.json()
+      console.log('📩 OpenAI response:', JSON.stringify(result, null, 2))
+
+      // Function callがあるかチェック
+      if (result.choices[0].message.tool_calls) {
+        const toolCall = result.choices[0].message.tool_calls[0]
+
+        if (toolCall.function.name === 'fetch_ga4_data') {
+          const args = JSON.parse(toolCall.function.arguments)
+          console.log('📞 Function call arguments:', args)
+
+          // GA4データ取得
+          console.log('📈 Fetching GA4 data...')
+          const ga4Data = await ga4Client.fetchAnalyticsData({
+            propertyId,
+            startDate: args.startDate,
+            endDate: args.endDate,
+            metrics: args.metrics,
+            dimensions: args.dimensions || [],
+            accessToken: session.accessToken,
+          })
+
+          console.log('✅ GA4 data retrieved, rows:', ga4Data.length)
+
+          // Function callの結果をOpenAIに返して最終回答を生成
+          messages.push(result.choices[0].message)
+          messages.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            content: JSON.stringify(ga4Data)
+          })
+
+          const finalResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o',
+              messages
+            })
+          })
+
+          const finalResult = await finalResponse.json()
+          const finalAnswer = finalResult.choices[0].message.content
+
+          return NextResponse.json({
+            success: true,
+            response: finalAnswer,
+            dataUsed: true,
+            dataPoints: ga4Data.length,
+          })
+        }
+      }
+
+      // Function callがない場合は直接回答
       return NextResponse.json({
         success: true,
-        response: finalAnswer,
-        dataUsed: true,
-        analysisConfig,
-        dataPoints: Array.isArray(ga4Data) ? ga4Data.length : 0,
+        response: result.choices[0].message.content,
+        dataUsed: false,
       })
 
     } catch (analysisError) {
       console.error('❌ Analysis Error:', analysisError)
 
-      // 分析でエラーが発生した場合のフォールバック
       return NextResponse.json({
         success: false,
         response: 'データの分析中にエラーが発生しました。しばらくしてからもう一度お試しください。',
@@ -153,123 +200,4 @@ export async function POST(request: NextRequest) {
       error: error instanceof Error ? error.message : 'Unknown error',
     }, { status: 500 })
   }
-}
-
-// 分析設定から日付範囲を計算するヘルパー関数
-function calculateDateRangeFromConfig(timeframe: any): { startDate: string; endDate: string } {
-  const today = new Date()
-  const yesterday = new Date(today)
-  yesterday.setDate(today.getDate() - 1)
-
-  if (timeframe.type === 'named') {
-    return handleNamedPeriod(timeframe.period, today)
-  }
-
-  switch (timeframe.period) {
-    case 'today':
-      return {
-        startDate: formatDate(today),
-        endDate: formatDate(today),
-      }
-
-    case 'yesterday':
-      return {
-        startDate: formatDate(yesterday),
-        endDate: formatDate(yesterday),
-      }
-
-    case 'last_7_days':
-      const sevenDaysAgo = new Date(today)
-      sevenDaysAgo.setDate(today.getDate() - 7)
-      return {
-        startDate: formatDate(sevenDaysAgo),
-        endDate: formatDate(today),
-      }
-
-    case 'last_30_days':
-      const thirtyDaysAgo = new Date(today)
-      thirtyDaysAgo.setDate(today.getDate() - 30)
-      return {
-        startDate: formatDate(thirtyDaysAgo),
-        endDate: formatDate(today),
-      }
-
-    case 'last_week':
-      const lastWeekEnd = new Date(today)
-      lastWeekEnd.setDate(today.getDate() - today.getDay() - 1)
-      const lastWeekStart = new Date(lastWeekEnd)
-      lastWeekStart.setDate(lastWeekEnd.getDate() - 6)
-      return {
-        startDate: formatDate(lastWeekStart),
-        endDate: formatDate(lastWeekEnd),
-      }
-
-    case 'this_week':
-      const thisWeekStart = new Date(today)
-      thisWeekStart.setDate(today.getDate() - today.getDay())
-      return {
-        startDate: formatDate(thisWeekStart),
-        endDate: formatDate(today),
-      }
-
-    case 'last_month':
-      const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1)
-      const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0)
-      return {
-        startDate: formatDate(lastMonth),
-        endDate: formatDate(lastMonthEnd),
-      }
-
-    case 'this_month':
-      const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1)
-      return {
-        startDate: formatDate(thisMonthStart),
-        endDate: formatDate(today),
-      }
-
-    default:
-      const defaultStart = new Date(today)
-      defaultStart.setDate(today.getDate() - 7)
-      return {
-        startDate: formatDate(defaultStart),
-        endDate: formatDate(today),
-      }
-  }
-}
-
-function handleNamedPeriod(period: string, today: Date): { startDate: string; endDate: string } {
-  const monthNames: Record<string, number> = {
-    '1月': 0, '2月': 1, '3月': 2, '4月': 3, '5月': 4, '6月': 5,
-    '7月': 6, '8月': 7, '9月': 8, '10月': 9, '11月': 10, '12月': 11
-  }
-
-  const monthIndex = monthNames[period]
-  if (monthIndex !== undefined) {
-    const currentMonth = today.getMonth()
-    const currentYear = today.getFullYear()
-
-    let targetYear = currentYear
-    if (monthIndex > currentMonth) {
-      targetYear = currentYear - 1
-    }
-
-    const monthStart = new Date(targetYear, monthIndex, 1)
-    const monthEnd = new Date(targetYear, monthIndex + 1, 0)
-
-    return {
-      startDate: formatDate(monthStart),
-      endDate: formatDate(monthEnd),
-    }
-  }
-
-  const defaultStart = new Date(today)
-  defaultStart.setDate(today.getDate() - 7)
-  return {
-    startDate: formatDate(defaultStart),
-    endDate: formatDate(today),
-  }
-}
-
-function formatDate(date: Date): string {
-  return date.toISOString().split('T')[0]
 }
