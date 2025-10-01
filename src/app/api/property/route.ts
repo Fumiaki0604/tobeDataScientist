@@ -1,0 +1,72 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '../auth/[...nextauth]/route'
+import { userProperties } from '../../../lib/storage'
+
+interface ExtendedSession {
+  user?: {
+    email?: string
+  }
+  [key: string]: any
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions) as ExtendedSession
+
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { propertyId } = await request.json()
+
+    if (!propertyId || typeof propertyId !== 'string') {
+      return NextResponse.json({ error: 'Invalid property ID' }, { status: 400 })
+    }
+
+    // GA4プロパティIDは数値のみである必要がある
+    const propertyIdTrimmed = propertyId.trim()
+    if (!/^\d+$/.test(propertyIdTrimmed)) {
+      return NextResponse.json({
+        error: 'Invalid property ID format. GA4 property ID should be numbers only (e.g., 123456789)'
+      }, { status: 400 })
+    }
+
+    // プロパティIDを保存
+    userProperties.set(session.user.email, propertyIdTrimmed)
+    console.log(`プロパティID保存: ${session.user.email} -> ${propertyIdTrimmed}`)
+    console.log('現在のストレージ:', Array.from(userProperties.entries()))
+
+    return NextResponse.json({ success: true, propertyId: propertyIdTrimmed })
+
+  } catch (error) {
+    console.error('Property API error:', error)
+    return NextResponse.json(
+      { error: 'Failed to save property ID' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function GET() {
+  try {
+    const session = await getServerSession(authOptions) as ExtendedSession
+
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const propertyId = userProperties.get(session.user.email)
+    console.log(`プロパティID取得: ${session.user.email} -> ${propertyId}`)
+    console.log('現在のストレージ:', Array.from(userProperties.entries()))
+
+    return NextResponse.json({ propertyId: propertyId || null })
+
+  } catch (error) {
+    console.error('Property API error:', error)
+    return NextResponse.json(
+      { error: 'Failed to get property ID' },
+      { status: 500 }
+    )
+  }
+}
