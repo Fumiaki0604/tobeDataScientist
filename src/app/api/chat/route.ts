@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
         content: question
       })
 
-      let response = await fetch('https://api.openai.com/v1/chat/completions', {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
         })
       })
 
-      let result = await response.json()
+      const result = await response.json()
       console.log('📩 OpenAI response:', JSON.stringify(result, null, 2))
 
       // Function callがあるかチェック
