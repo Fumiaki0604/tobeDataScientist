@@ -56,6 +56,7 @@ export default function Dashboard() {
       if (savedUserEmail && savedUserEmail !== currentUserEmail) {
         console.log('User account changed, clearing localStorage')
         localStorage.removeItem('ga4-property-id')
+        localStorage.removeItem('ga4-properties-cache')
         localStorage.removeItem('ga4-user-email')
         setPropertyId('')
       }
