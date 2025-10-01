@@ -94,10 +94,45 @@ export default function Dashboard() {
 
       if (channelResponse.ok) {
         const channelResult = await channelResponse.json()
+
+        // チャネルグループのマッピングルール
+        const channelMapping: Record<string, string> = {
+          'Cross-network': '広告',
+          'Paid Search': '広告',
+          'Display': '広告',
+          'Paid Social': '広告',
+          'Paid Other': '広告',
+          'Organic Social': 'SNS',
+          'Organic Search': '自然検索',
+          'Organic Video': '自然検索',
+          'Organic Shopping': '自然検索',
+        }
+
+        // チャネルグループごとに集計
+        const aggregated: Record<string, ChannelGroupDataItem> = {}
+
+        ;(channelResult.data || []).forEach((item: ChannelGroupDataItem) => {
+          const mappedChannel = channelMapping[item.sessionDefaultChannelGrouping] || item.sessionDefaultChannelGrouping
+
+          if (!aggregated[mappedChannel]) {
+            aggregated[mappedChannel] = {
+              sessionDefaultChannelGrouping: mappedChannel,
+              sessions: 0,
+              transactions: 0,
+              totalRevenue: 0,
+            }
+          }
+
+          aggregated[mappedChannel].sessions += item.sessions
+          aggregated[mappedChannel].transactions += item.transactions
+          aggregated[mappedChannel].totalRevenue += item.totalRevenue
+        })
+
         // セッション数で降順ソート
-        const sortedChannelData = (channelResult.data || []).sort((a: ChannelGroupDataItem, b: ChannelGroupDataItem) => {
+        const sortedChannelData = Object.values(aggregated).sort((a, b) => {
           return b.sessions - a.sessions
         })
+
         setChannelGroupData(sortedChannelData)
       }
 
@@ -262,11 +297,13 @@ export default function Dashboard() {
               <select
                 value={dateRange}
                 onChange={(e) => setDateRange(e.target.value)}
-                className="border rounded-lg px-3 py-2"
+                className="border rounded-lg px-3 py-2 text-gray-900"
               >
                 <option value="7daysAgo">過去7日間</option>
                 <option value="30daysAgo">過去30日間</option>
                 <option value="90daysAgo">過去90日間</option>
+                <option value="180daysAgo">過去180日間</option>
+                <option value="365daysAgo">過去365日間</option>
               </select>
             </div>
 

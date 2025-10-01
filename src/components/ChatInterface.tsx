@@ -227,7 +227,7 @@ export default function ChatInterface({ propertyId }: ChatInterfaceProps) {
               <button
                 key={index}
                 onClick={() => setInputMessage(example)}
-                className="text-xs px-3 py-1 bg-white border border-gray-200 rounded-full hover:bg-gray-50 transition-colors"
+                className="text-xs px-3 py-1 bg-white border border-gray-200 rounded-full hover:bg-gray-50 transition-colors text-gray-900"
                 disabled={isLoading}
               >
                 {example}
