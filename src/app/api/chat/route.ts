@@ -124,55 +124,62 @@ export async function POST(request: NextRequest) {
 
       // Function callがあるかチェック
       if (result.choices[0].message.tool_calls) {
-        const toolCall = result.choices[0].message.tool_calls[0]
+        const toolCalls = result.choices[0].message.tool_calls
+        console.log(`📞 Processing ${toolCalls.length} function call(s)...`)
 
-        if (toolCall.function.name === 'fetch_ga4_data') {
-          const args = JSON.parse(toolCall.function.arguments)
-          console.log('📞 Function call arguments:', args)
+        // アシスタントのメッセージを追加
+        messages.push(result.choices[0].message)
 
-          // GA4データ取得
-          console.log('📈 Fetching GA4 data...')
-          const ga4Data = await ga4Client.fetchAnalyticsData({
-            propertyId,
-            startDate: args.startDate,
-            endDate: args.endDate,
-            metrics: args.metrics,
-            dimensions: args.dimensions || [],
-            accessToken: session.accessToken,
-          })
+        // 各Function Callを実行
+        for (const toolCall of toolCalls) {
+          if (toolCall.function.name === 'fetch_ga4_data') {
+            const args = JSON.parse(toolCall.function.arguments)
+            console.log('📞 Function call arguments:', args)
 
-          console.log('✅ GA4 data retrieved, rows:', ga4Data.length)
-
-          // Function callの結果をOpenAIに返して最終回答を生成
-          messages.push(result.choices[0].message)
-          messages.push({
-            role: 'tool',
-            tool_call_id: toolCall.id,
-            content: JSON.stringify(ga4Data)
-          })
-
-          const finalResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${apiKey}`
-            },
-            body: JSON.stringify({
-              model: 'gpt-4o',
-              messages
+            // GA4データ取得
+            console.log('📈 Fetching GA4 data...')
+            const ga4Data = await ga4Client.fetchAnalyticsData({
+              propertyId,
+              startDate: args.startDate,
+              endDate: args.endDate,
+              metrics: args.metrics,
+              dimensions: args.dimensions || [],
+              accessToken: session.accessToken,
             })
-          })
 
-          const finalResult = await finalResponse.json()
-          const finalAnswer = finalResult.choices[0].message.content
+            console.log('✅ GA4 data retrieved, rows:', ga4Data.length)
 
-          return NextResponse.json({
-            success: true,
-            response: finalAnswer,
-            dataUsed: true,
-            dataPoints: ga4Data.length,
-          })
+            // Function callの結果を追加
+            messages.push({
+              role: 'tool',
+              tool_call_id: toolCall.id,
+              content: JSON.stringify(ga4Data)
+            })
+          }
         }
+
+        // すべてのFunction Call結果をOpenAIに返して最終回答を生成
+        const finalResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o',
+            messages
+          })
+        })
+
+        const finalResult = await finalResponse.json()
+        const finalAnswer = finalResult.choices[0].message.content
+
+        return NextResponse.json({
+          success: true,
+          response: finalAnswer,
+          dataUsed: true,
+          functionCalls: toolCalls.length,
+        })
       }
 
       // Function callがない場合は直接回答
