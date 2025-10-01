@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
       // OpenAIにFunction Callingで質問を送信
       console.log('🤖 Sending question to OpenAI with Function Calling...')
 
-      const messages = [
+      const messages: any[] = [
         {
           role: 'system',
           content: `あなたはGoogle Analytics 4のデータ分析アシスタントです。ユーザーの質問に基づいて、適切なGA4データを取得し、分析結果を日本語で回答してください。
