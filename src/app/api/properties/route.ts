@@ -11,6 +11,10 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // デバッグ: セッション情報を確認
+    console.log('Session user:', session.user?.email)
+    console.log('Has access token:', !!session.accessToken)
+
     // OAuth2クライアントを設定
     const oauth2Client = new google.auth.OAuth2()
     oauth2Client.setCredentials({
