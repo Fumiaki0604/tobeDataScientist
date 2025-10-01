@@ -102,6 +102,8 @@ export default function Dashboard() {
           'Display': '広告',
           'Paid Social': '広告',
           'Paid Other': '広告',
+          'Paid Video': '広告',
+          'Paid Shopping': '広告',
           'Organic Social': 'SNS',
           'Organic Search': '自然検索',
           'Organic Video': '自然検索',
@@ -172,7 +174,7 @@ export default function Dashboard() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
         <div className="bg-white p-8 rounded-lg shadow-md text-center max-w-md">
-          <h1 className="text-2xl font-bold mb-4">GA4 分析チャット</h1>
+          <h1 className="text-2xl font-bold mb-4 text-gray-900">GA4 分析チャット</h1>
           <p className="text-gray-900 mb-6">
             Google Analytics 4のデータをAIと対話しながら分析できるツールです。
             <br />
