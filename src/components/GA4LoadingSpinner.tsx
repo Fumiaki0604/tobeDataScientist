@@ -73,7 +73,7 @@ export default function GA4LoadingSpinner() {
         {animatedText.map((char, index) => (
           <div
             key={index}
-            className="absolute w-[20px] h-[36px] opacity-0 font-sans text-black text-2xl font-bold"
+            className="absolute w-[20px] h-[36px] opacity-0 font-sans text-gray-500 text-2xl font-normal"
             style={{
               animation: 'textMove 2s linear infinite',
               animationDelay: `${index * 0.2}s`,
