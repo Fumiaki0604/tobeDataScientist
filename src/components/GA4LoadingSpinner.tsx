@@ -1,6 +1,8 @@
 export default function GA4LoadingSpinner() {
+  const text = 'GA4プロパティを読み込んでいます'
+
   return (
-    <div className="fixed inset-0 bg-gray-50 flex flex-col items-center justify-center z-50 gap-6">
+    <div className="fixed inset-0 bg-gray-50 flex flex-col items-center justify-center z-50 gap-12">
       <svg
         version="1.1"
         xmlns="http://www.w3.org/2000/svg"
@@ -63,7 +65,46 @@ export default function GA4LoadingSpinner() {
         />
       </svg>
 
-      <p className="text-lg text-gray-900 font-medium">GA4プロパティを読み込んでいます</p>
+      {/* アニメーションテキスト */}
+      <div className="relative w-[600px] h-[36px] overflow-visible select-none">
+        {text.split('').reverse().map((char, index) => (
+          <div
+            key={index}
+            className="absolute w-[20px] h-[36px] opacity-0 font-sans text-black text-2xl"
+            style={{
+              animation: 'textMove 2s linear infinite',
+              animationDelay: `${index * 0.2}s`,
+              transform: 'rotate(180deg)',
+            }}
+          >
+            {char}
+          </div>
+        ))}
+      </div>
+
+      <style jsx>{`
+        @keyframes textMove {
+          0% {
+            left: 0;
+            opacity: 0;
+          }
+          35% {
+            left: 41%;
+            transform: rotate(0deg);
+            opacity: 1;
+          }
+          65% {
+            left: 59%;
+            transform: rotate(0deg);
+            opacity: 1;
+          }
+          100% {
+            left: 100%;
+            transform: rotate(-180deg);
+            opacity: 0;
+          }
+        }
+      `}</style>
     </div>
   )
 }
