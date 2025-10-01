@@ -79,6 +79,14 @@ export default function PropertySelector({ onPropertySelected, selectedPropertyI
   }, [onPropertySelected])
 
   useEffect(() => {
+    // selectedPropertyIdが空の場合（アカウント切り替え直後など）は
+    // キャッシュを使わずに最新のプロパティ一覧を取得
+    if (selectedPropertyId === '') {
+      console.log('PropertySelector: selectedPropertyId is empty, fetching fresh properties')
+      fetchProperties(false) // 通常のローディング表示で取得
+      return
+    }
+
     // ローカルストレージからキャッシュされたプロパティを読み込み
     const cachedProperties = localStorage.getItem('ga4-properties-cache')
     if (cachedProperties) {
@@ -102,7 +110,7 @@ export default function PropertySelector({ onPropertySelected, selectedPropertyI
 
     // バックグラウンドでプロパティ一覧を更新
     fetchProperties(true)
-  }, [fetchProperties, onPropertySelected])
+  }, [fetchProperties, onPropertySelected, selectedPropertyId])
 
   useEffect(() => {
     if (selectedPropertyId && properties.length > 0) {
