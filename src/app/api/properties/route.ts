@@ -27,8 +27,10 @@ export async function GET() {
       auth: oauth2Client,
     })
 
-    // アカウント一覧を取得
-    const accountsResponse = await analyticsAdmin.accounts.list()
+    // アカウント一覧を取得（最大50件に制限）
+    const accountsResponse = await analyticsAdmin.accounts.list({
+      pageSize: 50,
+    })
     const accounts = accountsResponse.data.accounts || []
 
     // 各アカウントのプロパティを取得
@@ -39,6 +41,7 @@ export async function GET() {
         try {
           const propertiesResponse = await analyticsAdmin.properties.list({
             filter: `parent:${account.name}`,
+            pageSize: 50, // プロパティも最大50件に制限
           })
 
           const properties = propertiesResponse.data.properties || []

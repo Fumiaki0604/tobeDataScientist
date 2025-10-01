@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { ChevronDown, Check, Globe } from 'lucide-react'
+import GA4LoadingSpinner from './GA4LoadingSpinner'
 
 interface Property {
   id: string
@@ -136,11 +137,7 @@ export default function PropertySelector({ onPropertySelected, selectedPropertyI
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-lg">プロパティ一覧を読み込み中...</div>
-      </div>
-    )
+    return <GA4LoadingSpinner />
   }
 
   if (error) {
