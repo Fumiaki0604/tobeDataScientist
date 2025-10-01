@@ -58,7 +58,14 @@ export default function Dashboard() {
         localStorage.removeItem('ga4-property-id')
         localStorage.removeItem('ga4-properties-cache')
         localStorage.removeItem('ga4-user-email')
+        // 即座にpropertyIdを空文字列にリセット
         setPropertyId('')
+        // 現在のユーザーメールを保存
+        if (currentUserEmail) {
+          localStorage.setItem('ga4-user-email', currentUserEmail)
+        }
+        // アカウント変更時はここで処理を終了（localStorageから読み込まない）
+        return
       }
 
       // 現在のユーザーメールを保存

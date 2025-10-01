@@ -110,6 +110,9 @@ export default function PropertySelector({ onPropertySelected, selectedPropertyI
       if (property) {
         setSelectedProperty(property)
       }
+    } else if (selectedPropertyId === '') {
+      // プロパティIDが空文字列にリセットされた場合、選択状態もクリア
+      setSelectedProperty(null)
     }
   }, [selectedPropertyId, properties])
 
