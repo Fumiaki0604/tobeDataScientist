@@ -46,11 +46,31 @@ export default function Dashboard() {
   }
 
   // ページロード時にlocalStorageからプロパティIDを取得
+  // アカウント変更時にlocalStorageをクリア
   useEffect(() => {
-    if (session && !propertyId) {
-      const savedPropertyId = localStorage.getItem('ga4-property-id')
-      if (savedPropertyId) {
-        setPropertyId(savedPropertyId)
+    if (session) {
+      const currentUserEmail = session.user?.email
+      const savedUserEmail = localStorage.getItem('ga4-user-email')
+
+      // アカウントが変更された場合、localStorageをクリア
+      if (savedUserEmail && savedUserEmail !== currentUserEmail) {
+        console.log('User account changed, clearing localStorage')
+        localStorage.removeItem('ga4-property-id')
+        localStorage.removeItem('ga4-user-email')
+        setPropertyId('')
+      }
+
+      // 現在のユーザーメールを保存
+      if (currentUserEmail) {
+        localStorage.setItem('ga4-user-email', currentUserEmail)
+      }
+
+      // プロパティIDが未設定の場合のみlocalStorageから取得
+      if (!propertyId) {
+        const savedPropertyId = localStorage.getItem('ga4-property-id')
+        if (savedPropertyId) {
+          setPropertyId(savedPropertyId)
+        }
       }
     }
   }, [session, propertyId])
