@@ -3,14 +3,8 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema, } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
-import { QueryAnalyzer } from './query-analyzer.js';
 import { GA4Client } from './ga4-client.js';
-import { DataProcessor } from './data-processor.js';
 // ツール入力スキーマ定義
-const AnalyzeQuerySchema = z.object({
-    question: z.string().describe('ユーザーの質問'),
-    propertyId: z.string().describe('GA4プロパティID'),
-});
 const FetchGA4DataSchema = z.object({
     propertyId: z.string().describe('GA4プロパティID'),
     startDate: z.string().describe('開始日 (YYYY-MM-DD)'),
@@ -19,16 +13,9 @@ const FetchGA4DataSchema = z.object({
     dimensions: z.array(z.string()).describe('取得するディメンション'),
     accessToken: z.string().describe('OAuth2アクセストークン'),
 });
-const ProcessDataSchema = z.object({
-    data: z.any().describe('GA4レスポンスデータ'),
-    question: z.string().describe('元の質問'),
-    analysisType: z.string().describe('分析タイプ'),
-});
 class GA4MCPServer {
     server;
-    queryAnalyzer;
     ga4Client;
-    dataProcessor;
     constructor() {
         this.server = new Server({
             name: 'ga4-analytics-server',
@@ -38,9 +25,7 @@ class GA4MCPServer {
                 tools: {},
             },
         });
-        this.queryAnalyzer = new QueryAnalyzer();
         this.ga4Client = new GA4Client();
-        this.dataProcessor = new DataProcessor();
         this.setupToolHandlers();
     }
     setupToolHandlers() {
@@ -49,50 +34,52 @@ class GA4MCPServer {
             return {
                 tools: [
                     {
-                        name: 'analyze_ga4_query',
-                        description: 'GA4関連の質問を解析して適切なデータ取得パラメータを決定する',
-                        inputSchema: {
-                            type: 'object',
-                            properties: {
-                                question: {
-                                    type: 'string',
-                                    description: 'ユーザーの質問',
-                                },
-                                propertyId: {
-                                    type: 'string',
-                                    description: 'GA4プロパティID',
-                                },
-                            },
-                            required: ['question', 'propertyId'],
-                        },
-                    },
-                    {
                         name: 'fetch_ga4_data',
-                        description: 'GA4 APIからデータを取得する',
+                        description: `Google Analytics 4 (GA4) からデータを取得します。
+
+【利用可能なメトリクス】
+- totalRevenue: 総収益
+- screenPageViews: ページビュー数
+- activeUsers: アクティブユーザー数
+- sessions: セッション数
+- transactions: トランザクション数
+- itemRevenue: 商品売上
+- itemsViewed: 商品閲覧数
+- itemsPurchased: 購入商品数
+
+【利用可能なディメンション】
+- date: 日付（トレンド分析に使用）
+- deviceCategory: デバイスカテゴリ
+- pagePath: ページパス
+- pageTitle: ページタイトル
+- sessionSource: セッションソース
+- sessionDefaultChannelGrouping: デフォルトチャネルグループ
+- itemName: 商品名（商品分析に必須）
+- itemCategory: 商品カテゴリ
+
+【使用例】
+- 特定日の商品別売上ランキング: metrics=['itemRevenue'], dimensions=['itemName'], startDate='2025-09-27', endDate='2025-09-27'
+- 月間のページビュー推移: metrics=['screenPageViews'], dimensions=['date'], startDate='2025-09-01', endDate='2025-09-30'
+- デバイス別売上: metrics=['totalRevenue'], dimensions=['deviceCategory']`,
                         inputSchema: {
                             type: 'object',
                             properties: {
                                 propertyId: { type: 'string', description: 'GA4プロパティID' },
-                                startDate: { type: 'string', description: '開始日 (YYYY-MM-DD)' },
-                                endDate: { type: 'string', description: '終了日 (YYYY-MM-DD)' },
-                                metrics: { type: 'array', items: { type: 'string' }, description: '取得するメトリクス' },
-                                dimensions: { type: 'array', items: { type: 'string' }, description: '取得するディメンション' },
+                                startDate: { type: 'string', description: '開始日 (YYYY-MM-DD形式)' },
+                                endDate: { type: 'string', description: '終了日 (YYYY-MM-DD形式)' },
+                                metrics: {
+                                    type: 'array',
+                                    items: { type: 'string' },
+                                    description: '取得するメトリクス（例: ["totalRevenue"], ["itemRevenue"]）'
+                                },
+                                dimensions: {
+                                    type: 'array',
+                                    items: { type: 'string' },
+                                    description: '取得するディメンション（例: ["itemName"], ["date", "deviceCategory"]）'
+                                },
                                 accessToken: { type: 'string', description: 'OAuth2アクセストークン' },
                             },
                             required: ['propertyId', 'startDate', 'endDate', 'metrics', 'accessToken'],
-                        },
-                    },
-                    {
-                        name: 'process_ga4_data',
-                        description: '取得したGA4データを処理・分析して回答を生成する',
-                        inputSchema: {
-                            type: 'object',
-                            properties: {
-                                data: { type: 'object', description: 'GA4レスポンスデータ' },
-                                question: { type: 'string', description: '元の質問' },
-                                analysisType: { type: 'string', description: '分析タイプ' },
-                            },
-                            required: ['data', 'question', 'analysisType'],
                         },
                     },
                 ],
@@ -103,18 +90,6 @@ class GA4MCPServer {
             const { name, arguments: args } = request.params;
             try {
                 switch (name) {
-                    case 'analyze_ga4_query': {
-                        const { question, propertyId } = AnalyzeQuerySchema.parse(args);
-                        const analysis = await this.queryAnalyzer.analyzeQuery(question, propertyId);
-                        return {
-                            content: [
-                                {
-                                    type: 'text',
-                                    text: JSON.stringify(analysis, null, 2),
-                                },
-                            ],
-                        };
-                    }
                     case 'fetch_ga4_data': {
                         const params = FetchGA4DataSchema.parse(args);
                         const data = await this.ga4Client.fetchAnalyticsData(params);
@@ -123,18 +98,6 @@ class GA4MCPServer {
                                 {
                                     type: 'text',
                                     text: JSON.stringify(data, null, 2),
-                                },
-                            ],
-                        };
-                    }
-                    case 'process_ga4_data': {
-                        const { data, question, analysisType } = ProcessDataSchema.parse(args);
-                        const result = await this.dataProcessor.processData(data, question, analysisType);
-                        return {
-                            content: [
-                                {
-                                    type: 'text',
-                                    text: result,
                                 },
                             ],
                         };

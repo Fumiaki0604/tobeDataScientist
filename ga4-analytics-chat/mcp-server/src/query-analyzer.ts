@@ -93,6 +93,41 @@ export class QueryAnalyzer {
   }
 
   private extractTimeframe(question: string) {
+    // 具体的な日付パターンの検索（YYYY/M/D, YYYY-M-D, M/D など）
+    const datePatterns = [
+      /(\d{4})[\/\-年](\d{1,2})[\/\-月](\d{1,2})日?/,  // 2025/9/27, 2025-9-27, 2025年9月27日
+      /(\d{1,2})[\/\-月](\d{1,2})日?/,                 // 9/27, 9月27日
+    ];
+
+    for (const pattern of datePatterns) {
+      const match = question.match(pattern);
+      if (match) {
+        let year: number, month: number, day: number;
+
+        if (match[0].includes('年') || match[1]?.length === 4) {
+          // YYYY/M/D 形式
+          year = parseInt(match[1]);
+          month = parseInt(match[2]);
+          day = parseInt(match[3]);
+        } else {
+          // M/D 形式（年は現在年を使用）
+          const currentYear = new Date().getFullYear();
+          year = currentYear;
+          month = parseInt(match[1]);
+          day = parseInt(match[2]);
+        }
+
+        const targetDate = new Date(year, month - 1, day);
+        const dateStr = this.formatDate(targetDate);
+
+        return {
+          type: 'absolute' as const,
+          startDate: dateStr,
+          endDate: dateStr,
+        };
+      }
+    }
+
     // 時間キーワードの検索
     for (const [keyword, pattern] of Object.entries(this.timePatterns)) {
       if (question.includes(keyword)) {
@@ -163,6 +198,14 @@ export class QueryAnalyzer {
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(today.getDate() - 1);
+
+    // 絶対日付の場合は直接返す
+    if (timeframe.type === 'absolute' && timeframe.startDate && timeframe.endDate) {
+      return {
+        startDate: timeframe.startDate,
+        endDate: timeframe.endDate,
+      };
+    }
 
     if (timeframe.type === 'named') {
       return this.handleNamedPeriod(timeframe.period!, today);
