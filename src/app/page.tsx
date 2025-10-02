@@ -41,6 +41,7 @@ export default function Dashboard() {
   const [error, setError] = useState('')
   const [propertyId, setPropertyId] = useState('')
   const [activeTab, setActiveTab] = useState<'dashboard' | 'chat'>('chat')
+  const [deviceFilter, setDeviceFilter] = useState('all')
 
   const handlePropertySelected = (selectedPropertyId: string) => {
     setPropertyId(selectedPropertyId)
@@ -104,7 +105,9 @@ export default function Dashboard() {
 
     try {
       // 日別データの取得
-      const response = await fetch(`/api/analytics?startDate=${startDate}&endDate=${endDate}&metrics=activeUsers,sessions,screenPageViews,transactions,totalRevenue&dimensions=date&propertyId=${propertyId}`)
+      // デバイスフィルターが有効な場合はdeviceCategoryディメンションを追加
+      const dimensions = deviceFilter !== 'all' ? 'date,deviceCategory' : 'date'
+      const response = await fetch(`/api/analytics?startDate=${startDate}&endDate=${endDate}&metrics=activeUsers,sessions,screenPageViews,transactions,totalRevenue&dimensions=${dimensions}&propertyId=${propertyId}`)
 
       if (!response.ok) {
         if (response.status === 400) {
@@ -114,8 +117,21 @@ export default function Dashboard() {
       }
 
       const result = await response.json()
+
+      // デバイスフィルターを適用
+      let filteredData = result.data || []
+      if (deviceFilter !== 'all') {
+        const deviceCategoryMap: Record<string, string> = {
+          'desktop': 'desktop',
+          'mobile': 'mobile'
+        }
+        filteredData = filteredData.filter((item: any) => {
+          return item.deviceCategory?.toLowerCase() === deviceCategoryMap[deviceFilter]
+        })
+      }
+
       // データを日付順にソート（GA4の日付フォーマット "20250929" を考慮）
-      const sortedData = (result.data || []).sort((a: AnalyticsDataItem, b: AnalyticsDataItem) => {
+      const sortedData = filteredData.sort((a: AnalyticsDataItem, b: AnalyticsDataItem) => {
         // GA4の日付フォーマット "20250929" を "2025-09-29" に変換してソート
         const parseGA4Date = (dateStr: string) => {
           if (dateStr.length === 8) {
@@ -131,10 +147,23 @@ export default function Dashboard() {
       setAnalyticsData(sortedData)
 
       // チャネルグループ別データの取得
-      const channelResponse = await fetch(`/api/analytics?startDate=${startDate}&endDate=${endDate}&metrics=sessions,transactions,totalRevenue&dimensions=sessionDefaultChannelGrouping&propertyId=${propertyId}`)
+      const channelDimensions = deviceFilter !== 'all' ? 'sessionDefaultChannelGrouping,deviceCategory' : 'sessionDefaultChannelGrouping'
+      const channelResponse = await fetch(`/api/analytics?startDate=${startDate}&endDate=${endDate}&metrics=sessions,transactions,totalRevenue&dimensions=${channelDimensions}&propertyId=${propertyId}`)
 
       if (channelResponse.ok) {
         const channelResult = await channelResponse.json()
+
+        // デバイスフィルターを適用
+        let filteredChannelData = channelResult.data || []
+        if (deviceFilter !== 'all') {
+          const deviceCategoryMap: Record<string, string> = {
+            'desktop': 'desktop',
+            'mobile': 'mobile'
+          }
+          filteredChannelData = filteredChannelData.filter((item: any) => {
+            return item.deviceCategory?.toLowerCase() === deviceCategoryMap[deviceFilter]
+          })
+        }
 
         // チャネルグループのマッピングルール
         const channelMapping: Record<string, string> = {
@@ -154,7 +183,7 @@ export default function Dashboard() {
         // チャネルグループごとに集計
         const aggregated: Record<string, ChannelGroupDataItem> = {}
 
-        ;(channelResult.data || []).forEach((item: ChannelGroupDataItem) => {
+        filteredChannelData.forEach((item: ChannelGroupDataItem) => {
           const mappedChannel = channelMapping[item.sessionDefaultChannelGrouping] || item.sessionDefaultChannelGrouping
 
           if (!aggregated[mappedChannel]) {
@@ -180,14 +209,29 @@ export default function Dashboard() {
       }
 
       // 商品別売上TOP10の取得（limit=10で最適化）
-      const productsResponse = await fetch(`/api/analytics?startDate=${startDate}&endDate=${endDate}&metrics=itemRevenue,itemsPurchased&dimensions=itemName&propertyId=${propertyId}&limit=10`)
+      const productDimensions = deviceFilter !== 'all' ? 'itemName,deviceCategory' : 'itemName'
+      const productsResponse = await fetch(`/api/analytics?startDate=${startDate}&endDate=${endDate}&metrics=itemRevenue,itemsPurchased&dimensions=${productDimensions}&propertyId=${propertyId}&limit=10`)
 
       if (productsResponse.ok) {
         const productsResult = await productsResponse.json()
+
+        // デバイスフィルターを適用
+        let filteredProductData = productsResult.data || []
+        if (deviceFilter !== 'all') {
+          const deviceCategoryMap: Record<string, string> = {
+            'desktop': 'desktop',
+            'mobile': 'mobile'
+          }
+          filteredProductData = filteredProductData.filter((item: any) => {
+            return item.deviceCategory?.toLowerCase() === deviceCategoryMap[deviceFilter]
+          })
+        }
+
         // 売上で降順ソート（GA4 APIがlimitを適用するがソートが必要な場合もある）
-        const sortedProducts = (productsResult.data || [])
+        const sortedProducts = filteredProductData
           .filter((item: TopProductItem) => item.itemName && item.itemRevenue > 0)
           .sort((a: TopProductItem, b: TopProductItem) => b.itemRevenue - a.itemRevenue)
+          .slice(0, 10) // デバイスフィルター後にTOP10を確保
         setTopProducts(sortedProducts)
       }
     } catch (err) {
@@ -195,7 +239,7 @@ export default function Dashboard() {
     } finally {
       setLoading(false)
     }
-  }, [session, propertyId, dateRange, customStartDate, customEndDate])
+  }, [session, propertyId, dateRange, customStartDate, customEndDate, deviceFilter])
 
   useEffect(() => {
     if (session && propertyId && activeTab === 'dashboard') {
@@ -349,6 +393,16 @@ export default function Dashboard() {
                 <option value="180daysAgo">過去180日間</option>
                 <option value="365daysAgo">過去365日間</option>
                 <option value="custom">カスタム</option>
+              </select>
+
+              <select
+                value={deviceFilter}
+                onChange={(e) => setDeviceFilter(e.target.value)}
+                className="border rounded-lg px-3 py-2 text-gray-900"
+              >
+                <option value="all">すべて</option>
+                <option value="desktop">Desktop</option>
+                <option value="mobile">モバイル</option>
               </select>
 
               {dateRange === 'custom' && (
