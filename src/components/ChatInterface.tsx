@@ -192,7 +192,7 @@ export default function ChatInterface({ propertyId }: ChatInterfaceProps) {
 
       {/* 入力フォーム */}
       <div className="p-4 border-t bg-gray-50 rounded-b-lg">
-        <div className="flex gap-3 items-end">
+        <div className="flex gap-3 items-center">
           <div className="flex-1">
             <textarea
               value={inputMessage}
