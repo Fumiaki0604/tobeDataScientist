@@ -36,6 +36,8 @@ export default function Dashboard() {
   const [topProducts, setTopProducts] = useState<TopProductItem[]>([])
   const [loading, setLoading] = useState(false)
   const [dateRange, setDateRange] = useState('7daysAgo')
+  const [customStartDate, setCustomStartDate] = useState('')
+  const [customEndDate, setCustomEndDate] = useState('')
   const [error, setError] = useState('')
   const [propertyId, setPropertyId] = useState('')
   const [activeTab, setActiveTab] = useState<'dashboard' | 'chat'>('chat')
