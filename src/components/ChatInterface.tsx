@@ -180,7 +180,7 @@ export default function ChatInterface({ propertyId }: ChatInterfaceProps) {
             </div>
             <div className="flex-1 max-w-3xl">
               <div className="inline-block p-3 rounded-lg bg-gray-100">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 text-gray-900">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <span>分析中...</span>
                 </div>
@@ -207,10 +207,10 @@ export default function ChatInterface({ propertyId }: ChatInterfaceProps) {
           <button
             onClick={sendMessage}
             disabled={!inputMessage.trim() || isLoading}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+            title="送信"
           >
-            <Send className="h-4 w-4" />
-            送信
+            <Send className="h-5 w-5" />
           </button>
         </div>
 
@@ -222,7 +222,9 @@ export default function ChatInterface({ propertyId }: ChatInterfaceProps) {
               '昨日と今日のPV数を比較してください',
               '先週のユーザー数はどのくらいですか？',
               'セッション数の傾向を教えてください',
-              '過去30日間の分析をお願いします'
+              '過去30日間の分析をお願いします',
+              '前年同月と直近一ヶ月から今月のユーザー数を予測してください',
+              '先月と今月でデバイス別の訪問者数を比較してください'
             ].map((example, index) => (
               <button
                 key={index}
