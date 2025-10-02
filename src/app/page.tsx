@@ -91,9 +91,20 @@ export default function Dashboard() {
     setLoading(true)
     setError('')
 
+    // 日付範囲を計算
+    const startDate = dateRange === 'custom' ? customStartDate : dateRange
+    const endDate = dateRange === 'custom' ? (customEndDate || new Date().toISOString().split('T')[0]) : 'today'
+
+    // カスタム期間が選択されているが日付が未設定の場合はエラー
+    if (dateRange === 'custom' && !customStartDate) {
+      setError('開始日を選択してください')
+      setLoading(false)
+      return
+    }
+
     try {
       // 日別データの取得
-      const response = await fetch(`/api/analytics?startDate=${dateRange}&endDate=today&metrics=activeUsers,sessions,screenPageViews,transactions,totalRevenue&dimensions=date&propertyId=${propertyId}`)
+      const response = await fetch(`/api/analytics?startDate=${startDate}&endDate=${endDate}&metrics=activeUsers,sessions,screenPageViews,transactions,totalRevenue&dimensions=date&propertyId=${propertyId}`)
 
       if (!response.ok) {
         if (response.status === 400) {
@@ -120,7 +131,7 @@ export default function Dashboard() {
       setAnalyticsData(sortedData)
 
       // チャネルグループ別データの取得
-      const channelResponse = await fetch(`/api/analytics?startDate=${dateRange}&endDate=today&metrics=sessions,transactions,totalRevenue&dimensions=sessionDefaultChannelGrouping&propertyId=${propertyId}`)
+      const channelResponse = await fetch(`/api/analytics?startDate=${startDate}&endDate=${endDate}&metrics=sessions,transactions,totalRevenue&dimensions=sessionDefaultChannelGrouping&propertyId=${propertyId}`)
 
       if (channelResponse.ok) {
         const channelResult = await channelResponse.json()
@@ -169,7 +180,7 @@ export default function Dashboard() {
       }
 
       // 商品別売上TOP10の取得（limit=10で最適化）
-      const productsResponse = await fetch(`/api/analytics?startDate=${dateRange}&endDate=today&metrics=itemRevenue,itemsPurchased&dimensions=itemName&propertyId=${propertyId}&limit=10`)
+      const productsResponse = await fetch(`/api/analytics?startDate=${startDate}&endDate=${endDate}&metrics=itemRevenue,itemsPurchased&dimensions=itemName&propertyId=${propertyId}&limit=10`)
 
       if (productsResponse.ok) {
         const productsResult = await productsResponse.json()
@@ -184,7 +195,7 @@ export default function Dashboard() {
     } finally {
       setLoading(false)
     }
-  }, [session, propertyId, dateRange])
+  }, [session, propertyId, dateRange, customStartDate, customEndDate])
 
   useEffect(() => {
     if (session && propertyId && activeTab === 'dashboard') {
@@ -324,8 +335,9 @@ export default function Dashboard() {
           )}
 
           {/* 期間選択 */}
-          <div className="mb-6 flex justify-between items-center">
-              <h2 className="text-xl font-semibold text-gray-900">データダッシュボード</h2>
+          <div className="mb-6 flex justify-between items-center gap-4">
+            <h2 className="text-xl font-semibold text-gray-900">データダッシュボード</h2>
+            <div className="flex items-center gap-3">
               <select
                 value={dateRange}
                 onChange={(e) => setDateRange(e.target.value)}
@@ -336,8 +348,30 @@ export default function Dashboard() {
                 <option value="90daysAgo">過去90日間</option>
                 <option value="180daysAgo">過去180日間</option>
                 <option value="365daysAgo">過去365日間</option>
+                <option value="custom">カスタム</option>
               </select>
+
+              {dateRange === 'custom' && (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={customStartDate}
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                    className="border rounded-lg px-3 py-2 text-gray-900"
+                    placeholder="開始日"
+                  />
+                  <span className="text-gray-900">〜</span>
+                  <input
+                    type="date"
+                    value={customEndDate}
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                    className="border rounded-lg px-3 py-2 text-gray-900"
+                    placeholder="終了日"
+                  />
+                </div>
+              )}
             </div>
+          </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6 mb-8">
               <div className="bg-white p-6 rounded-lg shadow-sm border">
