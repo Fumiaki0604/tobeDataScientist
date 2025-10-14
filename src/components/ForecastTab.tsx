@@ -18,6 +18,7 @@ export default function ForecastTab({ propertyId, analyticsData }: ForecastTabPr
   const [periodType, setPeriodType] = useState<'current_month' | 'next_month'>('current_month')
   const [error, setError] = useState('')
   const [apiStatus, setApiStatus] = useState<'checking' | 'ready' | 'waking'>('checking')
+  const [monthlyActualData, setMonthlyActualData] = useState<{ [key: string]: number }>({})
 
   // 期間の計算
   const calculatePeriods = () => {
@@ -61,6 +62,58 @@ export default function ForecastTab({ propertyId, analyticsData }: ForecastTabPr
     }
     wakeUpApi()
   }, [])
+
+  // 月初から今日までの実績データを取得
+  useEffect(() => {
+    const fetchMonthlyActualData = async () => {
+      if (!propertyId) return
+
+      try {
+        const today = new Date()
+        const currentYear = today.getFullYear()
+        const currentMonth = today.getMonth()
+
+        // 今月の月初
+        const startOfCurrentMonth = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`
+        // 先月の月初（来月末まで予測する場合に備えて）
+        const startOfLastMonth = new Date(currentYear, currentMonth - 1, 1)
+        const lastMonthStr = `${startOfLastMonth.getFullYear()}-${String(startOfLastMonth.getMonth() + 1).padStart(2, '0')}-01`
+
+        // 今日
+        const todayStr = today.toISOString().split('T')[0]
+
+        // 先月から今日までのデータを取得
+        const response = await fetch(
+          `/api/analytics?startDate=${lastMonthStr}&endDate=${todayStr}&metrics=totalRevenue&dimensions=date&propertyId=${propertyId}`
+        )
+
+        if (response.ok) {
+          const result = await response.json()
+          const data = result.data || []
+
+          // 月別に集計
+          const monthlyData: { [key: string]: number } = {}
+          data.forEach((item: any) => {
+            const itemDate = new Date(item.date.length === 8
+              ? `${item.date.substring(0, 4)}-${item.date.substring(4, 6)}-${item.date.substring(6, 8)}`
+              : item.date)
+            const monthKey = `${itemDate.getFullYear()}/${String(itemDate.getMonth() + 1).padStart(2, '0')}`
+
+            if (!monthlyData[monthKey]) {
+              monthlyData[monthKey] = 0
+            }
+            monthlyData[monthKey] += item.totalRevenue || 0
+          })
+
+          setMonthlyActualData(monthlyData)
+        }
+      } catch (err) {
+        console.error('月次実績データの取得に失敗:', err)
+      }
+    }
+
+    fetchMonthlyActualData()
+  }, [propertyId])
 
   const handleForecast = async () => {
     if (analyticsData.length < 7) {
@@ -136,32 +189,15 @@ export default function ForecastTab({ propertyId, analyticsData }: ForecastTabPr
   const calculateMonthlySales = () => {
     if (!forecastData) return []
 
-    const today = new Date()
-    const currentYear = today.getFullYear()
-    const currentMonth = today.getMonth()
-
-    // 今日までの実績データ
-    const actualData = analyticsData.filter(item => {
-      const itemDate = new Date(item.date.length === 8
-        ? `${item.date.substring(0, 4)}-${item.date.substring(4, 6)}-${item.date.substring(6, 8)}`
-        : item.date)
-      return itemDate <= today
-    })
-
     // 月別に集計
     const monthlyData: { [key: string]: { actual: number, forecast: number } } = {}
 
-    // 実績データの集計
-    actualData.forEach(item => {
-      const itemDate = new Date(item.date.length === 8
-        ? `${item.date.substring(0, 4)}-${item.date.substring(4, 6)}-${item.date.substring(6, 8)}`
-        : item.date)
-      const monthKey = `${itemDate.getFullYear()}/${String(itemDate.getMonth() + 1).padStart(2, '0')}`
-
+    // 月初からの実績データを使用
+    Object.entries(monthlyActualData).forEach(([monthKey, actualRevenue]) => {
       if (!monthlyData[monthKey]) {
         monthlyData[monthKey] = { actual: 0, forecast: 0 }
       }
-      monthlyData[monthKey].actual += item.totalRevenue
+      monthlyData[monthKey].actual = actualRevenue
     })
 
     // 予測データの集計
