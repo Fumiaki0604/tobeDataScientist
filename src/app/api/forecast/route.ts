@@ -5,8 +5,12 @@ const FORECAST_API_URL = process.env.FORECAST_API_URL || 'http://localhost:8000'
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('Forecast API URL:', FORECAST_API_URL)
+
     const body = await request.json()
     const { data, periods, metric_name } = body
+
+    console.log('Request data length:', data?.length)
 
     // バリデーション
     if (!data || !Array.isArray(data) || data.length < 7) {
@@ -17,6 +21,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Python予測APIを呼び出し
+    console.log('Calling Python API:', `${FORECAST_API_URL}/forecast`)
     const response = await fetch(`${FORECAST_API_URL}/forecast`, {
       method: 'POST',
       headers: {
@@ -29,9 +34,12 @@ export async function POST(request: NextRequest) {
       }),
     })
 
+    console.log('Python API response status:', response.status)
+
     if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.detail || '予測APIエラー')
+      const errorText = await response.text()
+      console.error('Python API error:', errorText)
+      throw new Error(`予測APIエラー: ${errorText}`)
     }
 
     const forecastData = await response.json()
@@ -42,6 +50,7 @@ export async function POST(request: NextRequest) {
       {
         error: '予測処理に失敗しました',
         details: error instanceof Error ? error.message : '不明なエラー',
+        apiUrl: FORECAST_API_URL,
       },
       { status: 500 }
     )
