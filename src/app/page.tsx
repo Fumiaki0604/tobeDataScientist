@@ -6,6 +6,7 @@ import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, R
 import { Users, Eye, MousePointer, MessageSquare, BarChart3 } from 'lucide-react'
 import PropertySelector from '../components/PropertySelector'
 import ChatInterface from '../components/ChatInterface'
+import ForecastTab from '../components/ForecastTab'
 
 interface AnalyticsDataItem {
   date: string
@@ -40,7 +41,7 @@ export default function Dashboard() {
   const [customEndDate, setCustomEndDate] = useState('')
   const [error, setError] = useState('')
   const [propertyId, setPropertyId] = useState('')
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'chat'>('chat')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'chat' | 'forecast'>('chat')
   const [deviceFilter, setDeviceFilter] = useState('all')
 
   const handlePropertySelected = (selectedPropertyId: string) => {
@@ -242,7 +243,7 @@ export default function Dashboard() {
   }, [session, propertyId, dateRange, customStartDate, customEndDate, deviceFilter])
 
   useEffect(() => {
-    if (session && propertyId && activeTab === 'dashboard') {
+    if (session && propertyId && (activeTab === 'dashboard' || activeTab === 'forecast')) {
       fetchAnalyticsData()
     }
   }, [session, propertyId, fetchAnalyticsData, activeTab])
@@ -357,6 +358,22 @@ export default function Dashboard() {
                 <div className="flex items-center gap-2">
                   <BarChart3 className="h-4 w-4" />
                   ダッシュボード
+                </div>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('forecast')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'forecast'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-900 hover:text-gray-900 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                  </svg>
+                  売上予測
                 </div>
               </button>
             </nav>
@@ -796,6 +813,14 @@ export default function Dashboard() {
                 )}
               </div>
             </div>
+        </div>
+
+        {/* 予測タブ */}
+        <div className={activeTab === 'forecast' ? '' : 'hidden'}>
+          <ForecastTab
+            propertyId={propertyId}
+            analyticsData={analyticsData}
+          />
         </div>
       </main>
     </div>
