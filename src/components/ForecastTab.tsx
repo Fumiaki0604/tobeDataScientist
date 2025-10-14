@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Area, AreaChart } from 'recharts'
 import { TrendingUp, Calendar, DollarSign } from 'lucide-react'
 
@@ -17,6 +17,31 @@ export default function ForecastTab({ propertyId, analyticsData }: ForecastTabPr
   const [loading, setLoading] = useState(false)
   const [periods, setPeriods] = useState(30)
   const [error, setError] = useState('')
+  const [apiStatus, setApiStatus] = useState<'checking' | 'ready' | 'waking'>('checking')
+
+  // コンポーネントマウント時にPython APIをウェイクアップ
+  useEffect(() => {
+    const wakeUpApi = async () => {
+      try {
+        setApiStatus('checking')
+        const response = await fetch('/api/forecast/health', { method: 'GET' })
+        if (response.ok) {
+          setApiStatus('ready')
+        } else {
+          setApiStatus('waking')
+          // 30秒後に再チェック
+          setTimeout(() => {
+            fetch('/api/forecast/health').then(res => {
+              if (res.ok) setApiStatus('ready')
+            })
+          }, 30000)
+        }
+      } catch (err) {
+        setApiStatus('waking')
+      }
+    }
+    wakeUpApi()
+  }, [])
 
   const handleForecast = async () => {
     if (analyticsData.length < 7) {
@@ -127,6 +152,18 @@ export default function ForecastTab({ propertyId, analyticsData }: ForecastTabPr
           {analyticsData.length < 7 && (
             <div className="text-amber-600 text-sm">
               ※ 予測を実行するには、最低7日分のデータが必要です
+            </div>
+          )}
+
+          {/* API起動状態 */}
+          {apiStatus === 'waking' && (
+            <div className="bg-amber-50 border border-amber-200 rounded p-3 text-sm text-amber-800">
+              予測APIを起動しています...（初回は30秒〜1分かかる場合があります）
+            </div>
+          )}
+          {apiStatus === 'checking' && (
+            <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm text-blue-800">
+              予測APIの状態を確認中...
             </div>
           )}
         </div>
