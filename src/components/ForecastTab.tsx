@@ -15,9 +15,28 @@ interface ForecastTabProps {
 export default function ForecastTab({ propertyId, analyticsData }: ForecastTabProps) {
   const [forecastData, setForecastData] = useState<any>(null)
   const [loading, setLoading] = useState(false)
-  const [periods, setPeriods] = useState(30)
+  const [periodType, setPeriodType] = useState<'current_month' | 'next_month'>('current_month')
   const [error, setError] = useState('')
   const [apiStatus, setApiStatus] = useState<'checking' | 'ready' | 'waking'>('checking')
+
+  // 期間の計算
+  const calculatePeriods = () => {
+    const today = new Date()
+    const currentYear = today.getFullYear()
+    const currentMonth = today.getMonth()
+
+    if (periodType === 'current_month') {
+      // 今月末まで
+      const endOfMonth = new Date(currentYear, currentMonth + 1, 0)
+      const daysUntilEndOfMonth = Math.ceil((endOfMonth.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+      return daysUntilEndOfMonth
+    } else {
+      // 来月末まで
+      const endOfNextMonth = new Date(currentYear, currentMonth + 2, 0)
+      const daysUntilEndOfNextMonth = Math.ceil((endOfNextMonth.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+      return daysUntilEndOfNextMonth
+    }
+  }
 
   // コンポーネントマウント時にPython APIをウェイクアップ
   useEffect(() => {
@@ -53,6 +72,8 @@ export default function ForecastTab({ propertyId, analyticsData }: ForecastTabPr
     setError('')
 
     try {
+      const periods = calculatePeriods()
+
       // GA4データを予測API用に変換
       const data = analyticsData.map(item => ({
         date: item.date,
@@ -111,6 +132,60 @@ export default function ForecastTab({ propertyId, analyticsData }: ForecastTabPr
     ? forecastData.forecast.reduce((sum: number, item: any) => sum + item.predicted, 0)
     : 0
 
+  // 月別売上予測の計算
+  const calculateMonthlySales = () => {
+    if (!forecastData) return []
+
+    const today = new Date()
+    const currentYear = today.getFullYear()
+    const currentMonth = today.getMonth()
+
+    // 今日までの実績データ
+    const actualData = analyticsData.filter(item => {
+      const itemDate = new Date(item.date.length === 8
+        ? `${item.date.substring(0, 4)}-${item.date.substring(4, 6)}-${item.date.substring(6, 8)}`
+        : item.date)
+      return itemDate <= today
+    })
+
+    // 月別に集計
+    const monthlyData: { [key: string]: { actual: number, forecast: number } } = {}
+
+    // 実績データの集計
+    actualData.forEach(item => {
+      const itemDate = new Date(item.date.length === 8
+        ? `${item.date.substring(0, 4)}-${item.date.substring(4, 6)}-${item.date.substring(6, 8)}`
+        : item.date)
+      const monthKey = `${itemDate.getFullYear()}/${String(itemDate.getMonth() + 1).padStart(2, '0')}`
+
+      if (!monthlyData[monthKey]) {
+        monthlyData[monthKey] = { actual: 0, forecast: 0 }
+      }
+      monthlyData[monthKey].actual += item.totalRevenue
+    })
+
+    // 予測データの集計
+    forecastData.forecast.forEach((item: any) => {
+      const itemDate = new Date(item.date)
+      const monthKey = `${itemDate.getFullYear()}/${String(itemDate.getMonth() + 1).padStart(2, '0')}`
+
+      if (!monthlyData[monthKey]) {
+        monthlyData[monthKey] = { actual: 0, forecast: 0 }
+      }
+      monthlyData[monthKey].forecast += item.predicted
+    })
+
+    // 結果を配列に変換して返す
+    return Object.entries(monthlyData).map(([month, data]) => ({
+      month,
+      actual: data.actual,
+      forecast: data.forecast,
+      total: data.actual + data.forecast
+    })).sort((a, b) => a.month.localeCompare(b.month))
+  }
+
+  const monthlySales = calculateMonthlySales()
+
   return (
     <div className="space-y-6">
       {/* 予測設定 */}
@@ -124,16 +199,16 @@ export default function ForecastTab({ propertyId, analyticsData }: ForecastTabPr
           <div className="flex flex-col sm:flex-row gap-4 items-end">
             <div className="flex-1">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                予測期間（日数）
+                予測期間
               </label>
-              <input
-                type="number"
-                min="7"
-                max="90"
-                value={periods}
-                onChange={(e) => setPeriods(Number(e.target.value))}
+              <select
+                value={periodType}
+                onChange={(e) => setPeriodType(e.target.value as 'current_month' | 'next_month')}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
+              >
+                <option value="current_month">今月末まで（{calculatePeriods()}日間）</option>
+                <option value="next_month">来月末まで（{calculatePeriods()}日間）</option>
+              </select>
             </div>
             <button
               onClick={handleForecast}
@@ -171,37 +246,84 @@ export default function ForecastTab({ propertyId, analyticsData }: ForecastTabPr
 
       {/* 予測サマリー */}
       {forecastData && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg shadow p-6">
-            <div className="flex items-center gap-2 text-blue-700 mb-2">
-              <DollarSign className="h-5 w-5" />
-              <span className="text-sm font-medium">予測期間の売上合計</span>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg shadow p-6">
+              <div className="flex items-center gap-2 text-blue-700 mb-2">
+                <DollarSign className="h-5 w-5" />
+                <span className="text-sm font-medium">予測期間の売上合計</span>
+              </div>
+              <div className="text-2xl font-bold text-blue-900">
+                ¥{forecastTotal.toLocaleString()}
+              </div>
             </div>
-            <div className="text-2xl font-bold text-blue-900">
-              ¥{forecastTotal.toLocaleString()}
+
+            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg shadow p-6">
+              <div className="flex items-center gap-2 text-green-700 mb-2">
+                <TrendingUp className="h-5 w-5" />
+                <span className="text-sm font-medium">予測期間</span>
+              </div>
+              <div className="text-2xl font-bold text-green-900">
+                {calculatePeriods()}日間
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg shadow p-6">
+              <div className="flex items-center gap-2 text-purple-700 mb-2">
+                <Calendar className="h-5 w-5" />
+                <span className="text-sm font-medium">1日あたり平均</span>
+              </div>
+              <div className="text-2xl font-bold text-purple-900">
+                ¥{Math.round(forecastTotal / calculatePeriods()).toLocaleString()}
+              </div>
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg shadow p-6">
-            <div className="flex items-center gap-2 text-green-700 mb-2">
-              <TrendingUp className="h-5 w-5" />
-              <span className="text-sm font-medium">予測期間</span>
+          {/* 月別売上予測 */}
+          {monthlySales.length > 0 && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <h3 className="text-lg font-semibold mb-4">月別売上予測</h3>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
+                        月
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-900 uppercase tracking-wider">
+                        実績売上
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-900 uppercase tracking-wider">
+                        予測売上
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-900 uppercase tracking-wider">
+                        合計
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {monthlySales.map((item, index) => (
+                      <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {item.month}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                          ¥{Math.round(item.actual).toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 text-right font-medium">
+                          ¥{Math.round(item.forecast).toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-bold">
+                          ¥{Math.round(item.total).toLocaleString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-            <div className="text-2xl font-bold text-green-900">
-              {periods}日間
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg shadow p-6">
-            <div className="flex items-center gap-2 text-purple-700 mb-2">
-              <Calendar className="h-5 w-5" />
-              <span className="text-sm font-medium">1日あたり平均</span>
-            </div>
-            <div className="text-2xl font-bold text-purple-900">
-              ¥{Math.round(forecastTotal / periods).toLocaleString()}
-            </div>
-          </div>
-        </div>
+          )}
+        </>
       )}
 
       {/* 予測グラフ */}
