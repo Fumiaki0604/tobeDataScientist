@@ -4,10 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## プロジェクト概要
 
-このリポジトリは、Google Analytics 4 (GA4) のデータ分析を自然言語で行うための2つのコンポーネントで構成されています：
+このリポジトリは、Google Analytics 4 (GA4) のデータ分析を自然言語で行うための3つのコンポーネントで構成されています：
 
 1. **MCP Server** (`mcp-server/`): Model Context Protocol サーバー - LLMがGA4 APIと対話するためのツールを提供
-2. **Next.js Web App** (`nextjs-project/`): GA4分析のためのWebインターフェース（OAuth認証、チャット機能）
+2. **Next.js Web App** (`nextjs-project/`): GA4分析のためのWebインターフェース（OAuth認証、チャット機能、予測機能）
+3. **Forecast API** (`forecast-api/`): Prophetを使用した売上予測Pythonサーバー
 
 ## 開発コマンド
 
@@ -28,12 +29,22 @@ npm start          # 本番サーバー起動
 npm run lint       # ESLint実行
 ```
 
+### Forecast API (Python)
+```bash
+cd forecast-api
+pip install -r requirements.txt  # 依存パッケージインストール
+python main.py                   # 開発サーバー起動 (http://localhost:8000)
+# または
+uvicorn main:app --reload        # ホットリロード付き開発モード
+```
+
 ### 環境変数設定
 Next.jsアプリケーションには`.env.local`が必要です（`.env.example`を参照）：
 - `NEXTAUTH_URL`: アプリケーションのベースURL
 - `NEXTAUTH_SECRET`: NextAuth用のシークレットキー
 - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`: Google OAuth認証情報
 - `OPENAI_API_KEY`: OpenAI APIキー（チャット機能用）
+- `FORECAST_API_URL`: 予測APIのURL（デフォルト: `http://localhost:8000`、本番: Render URL）
 
 ## アーキテクチャ
 
@@ -71,10 +82,13 @@ Next.jsアプリケーションには`.env.local`が必要です（`.env.example
     - `analytics/route.ts`: GA4データ取得API
     - `properties/route.ts`: ユーザーのGA4プロパティ一覧取得
     - `property/route.ts`: 特定プロパティのメタデータ取得
+    - `forecast/route.ts`: 予測APIプロキシ（Python Forecast APIへのリクエスト転送）
+    - `forecast/health/route.ts`: 予測サーバー状態確認・起動エンドポイント
 
 - `components/`: React コンポーネント
   - `ChatInterface.tsx`: AIチャットUI（質問例、分析状態表示）
   - `PropertySelector.tsx`: GA4プロパティ選択UI
+  - `ForecastTab.tsx`: 売上予測タブUI（Prophet予測の実行・表示、月別集計）
   - `GA4LoadingSpinner.tsx`: プロパティ読み込み中のローディング画面
 
 - `mcp-modules/`: GA4 Data API クライアント
@@ -109,6 +123,13 @@ Next.jsアプリケーションには`.env.local`が必要です（`.env.example
 **複数Function Callsの例**:
 - 「前年同月と直近一ヶ月から今月のユーザー数を予測してください」→ 2回のGA4データ取得
 - 「先月と今月でデバイス別の訪問者数を比較してください」→ 2回のGA4データ取得
+
+**予測APIとの連携**:
+- `/api/forecast/route.ts`: Next.js → Python Forecast APIへのプロキシ
+- `/api/forecast/health/route.ts`:
+  - GET: サーバー状態確認（`ready` / `unavailable`）
+  - POST: サーバー起動トリガー（Renderのウェイクアップ）
+- タイムアウト: GET=10秒、POST=30秒
 
 ## 重要な技術的決定
 
@@ -149,7 +170,58 @@ Next.jsアプリケーションには`.env.local`が必要です（`.env.example
 - `date`ディメンション使用時、日付は`YYYYMMDD`形式で返されます
 - デバイスカテゴリの値: `desktop`, `mobile`, `tablet`（小文字）
 
+### Forecast API (`forecast-api/`)
+
+**技術スタック**: FastAPI + Prophet + pandas
+
+**アーキテクチャ**: シンプルなRESTful API、過去データから時系列予測を実行
+
+**主要ファイル**:
+- `main.py`: FastAPIアプリケーション
+  - `GET /`: ヘルスチェック（基本情報）
+  - `GET /health`: サーバー状態確認用エンドポイント
+  - `POST /forecast`: 時系列予測実行
+
+**予測フロー**:
+1. Next.jsから過去のGA4売上データ（`date`, `value`）を受信
+2. Prophetモデルを作成・学習（日次・週次季節性を考慮）
+3. 指定期間（デフォルト30日）の予測を実行
+4. 予測値・信頼区間（95%）・過去データとのフィットを返却
+
+**注意点**:
+- 最低7日分のデータが必要（Prophetの制限）
+- Render無料プランでは15分間アクセスがないとスリープモード
+- 初回起動に30秒〜1分かかる場合あり
+
+## タブ別機能説明
+
+### 1. AIチャットタブ（デフォルト）
+- 自然言語でGA4データを質問
+- OpenAI Function Callingで動的にGA4 APIを呼び出し
+- 複数期間の比較・予測リクエストに対応
+
+### 2. ダッシュボードタブ
+- 日別セッション/ページビュー/トランザクション/売上グラフ
+- チャネル別・商品別分析テーブル
+- 日付範囲フィルター（7/30/90/180/365日、カスタム期間）
+- デバイスフィルター（全て/Desktop/モバイル）
+
+### 3. 売上予測タブ
+- **Prophet予測**: Meta社の時系列予測ライブラリを使用
+- **予測対象**: 売上（totalRevenue）
+- **予測期間**: 今月末まで / 来月末まで（動的計算）
+- **表示内容**:
+  - 予測グラフ（実績＝緑線、予測＝青点線、信頼区間＝薄青範囲）
+  - 月別売上予測テーブル（実績・予測・合計）
+  - 予測期間の売上合計、1日あたり平均
+- **サーバー状態管理**:
+  - ヘッダーに予測APIサーバー状態インジケーター表示
+  - サーバー停止時は「起動」ボタン表示、タブはグレーアウト
+  - 30秒ごとに自動状態チェック
+
 ## デプロイ
 - **プラットフォーム**: Render
 - **自動デプロイ**: masterブランチへのpush時
-- **ビルドコマンド**: `npm run build` (Turbopack使用)
+- **Next.js**: `npm run build` (Turbopack使用)
+- **Forecast API**: `pip install -r requirements.txt` → `uvicorn main:app --host 0.0.0.0 --port $PORT`
+- **環境変数**: `FORECAST_API_URL`にPythonサーバーのURLを設定
