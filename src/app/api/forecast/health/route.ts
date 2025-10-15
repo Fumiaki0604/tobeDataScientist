@@ -25,7 +25,7 @@ export async function POST() {
   try {
     const response = await fetch(`${FORECAST_API_URL}/health`, {
       method: 'GET',
-      signal: AbortSignal.timeout(30000), // 30秒でタイムアウト
+      signal: AbortSignal.timeout(60000), // 60秒でタイムアウト（Render無料プランの起動時間を考慮）
     })
 
     if (response.ok) {
@@ -37,7 +37,7 @@ export async function POST() {
   } catch (error) {
     return NextResponse.json({
       status: 'starting',
-      message: 'サーバーを起動中です。30秒〜1分後に再確認してください。'
+      message: 'サーバーを起動中です。1〜2分後に再確認してください。'
     }, { status: 503 })
   }
 }

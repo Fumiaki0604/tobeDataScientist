@@ -86,26 +86,44 @@ export default function Dashboard() {
 
       if (response.ok && data.status === 'started') {
         setForecastServerStatus('ready')
+        setIsStartingServer(false)
       } else {
-        // 起動中の場合は10秒後に再チェック（最大3回）
+        // 起動中の場合は10秒後に再チェック（最大12回=120秒）
         let retryCount = 0
+        const maxRetries = 12
         const checkInterval = setInterval(async () => {
           retryCount++
-          const checkResponse = await fetch('/api/forecast/health', { method: 'GET' })
-          if (checkResponse.ok) {
-            setForecastServerStatus('ready')
-            clearInterval(checkInterval)
-          } else if (retryCount >= 6) {
-            // 60秒（10秒×6回）経過しても起動しない場合
-            setForecastServerStatus('unavailable')
-            clearInterval(checkInterval)
+          console.log(`予測サーバー起動チェック: ${retryCount}/${maxRetries}`)
+
+          try {
+            const checkResponse = await fetch('/api/forecast/health', { method: 'GET' })
+            if (checkResponse.ok) {
+              console.log('予測サーバー起動成功')
+              setForecastServerStatus('ready')
+              clearInterval(checkInterval)
+              setIsStartingServer(false)
+            } else if (retryCount >= maxRetries) {
+              // 120秒（10秒×12回）経過しても起動しない場合
+              console.log('予測サーバー起動タイムアウト')
+              setForecastServerStatus('unavailable')
+              clearInterval(checkInterval)
+              setIsStartingServer(false)
+            }
+          } catch (error) {
+            console.log(`起動チェックエラー (${retryCount}/${maxRetries}):`, error)
+            if (retryCount >= maxRetries) {
+              setForecastServerStatus('unavailable')
+              clearInterval(checkInterval)
+              setIsStartingServer(false)
+            }
           }
         }, 10000)
       }
     } catch (err) {
+      console.error('予測サーバー起動エラー:', err)
       // エラー時も再チェックを試みる
+      setForecastServerStatus('starting')
       setTimeout(() => checkForecastServerStatus(false), 10000)
-    } finally {
       setIsStartingServer(false)
     }
   }
@@ -391,7 +409,7 @@ export default function Dashboard() {
                   }`} />
                   <span className="text-xs font-medium text-gray-700">
                     {forecastServerStatus === 'ready' ? '予測API: 起動中' :
-                     forecastServerStatus === 'starting' ? '予測API: 起動中...（最大60秒）' :
+                     forecastServerStatus === 'starting' ? '予測API: 起動中...（最大2分）' :
                      forecastServerStatus === 'checking' ? '予測API: 確認中...' :
                      '予測API: 停止中'}
                   </span>
@@ -401,7 +419,7 @@ export default function Dashboard() {
                     onClick={startForecastServer}
                     disabled={isStartingServer}
                     className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                    title="予測サーバーを起動します（30秒〜60秒かかります）"
+                    title="予測サーバーを起動します（60秒〜120秒かかります）"
                   >
                     起動
                   </button>
