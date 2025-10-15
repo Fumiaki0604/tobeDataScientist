@@ -43,11 +43,56 @@ export default function Dashboard() {
   const [propertyId, setPropertyId] = useState('')
   const [activeTab, setActiveTab] = useState<'dashboard' | 'chat' | 'forecast'>('chat')
   const [deviceFilter, setDeviceFilter] = useState('all')
+  const [forecastServerStatus, setForecastServerStatus] = useState<'checking' | 'ready' | 'unavailable' | 'starting'>('checking')
+  const [isStartingServer, setIsStartingServer] = useState(false)
 
   const handlePropertySelected = (selectedPropertyId: string) => {
     setPropertyId(selectedPropertyId)
     setError('')
   }
+
+  // Pythonサーバーの状態をチェック
+  const checkForecastServerStatus = useCallback(async () => {
+    try {
+      const response = await fetch('/api/forecast/health', { method: 'GET' })
+      if (response.ok) {
+        setForecastServerStatus('ready')
+      } else {
+        setForecastServerStatus('unavailable')
+      }
+    } catch (err) {
+      setForecastServerStatus('unavailable')
+    }
+  }, [])
+
+  // Pythonサーバーを起動
+  const startForecastServer = async () => {
+    setIsStartingServer(true)
+    setForecastServerStatus('starting')
+    try {
+      const response = await fetch('/api/forecast/health', { method: 'POST' })
+      const data = await response.json()
+
+      if (response.ok && data.status === 'started') {
+        setForecastServerStatus('ready')
+      } else {
+        // 起動中の場合は30秒後に再チェック
+        setTimeout(checkForecastServerStatus, 30000)
+      }
+    } catch (err) {
+      setTimeout(checkForecastServerStatus, 30000)
+    } finally {
+      setIsStartingServer(false)
+    }
+  }
+
+  // 初回マウント時とactiveTabが'forecast'に変更された時にサーバー状態をチェック
+  useEffect(() => {
+    checkForecastServerStatus()
+    // 30秒ごとに定期チェック
+    const interval = setInterval(checkForecastServerStatus, 30000)
+    return () => clearInterval(interval)
+  }, [checkForecastServerStatus])
 
   // ページロード時にlocalStorageからプロパティIDを取得
   // アカウント変更時にlocalStorageをクリア
@@ -311,6 +356,33 @@ export default function Dashboard() {
                 selectedPropertyId={propertyId}
               />
 
+              {/* 予測サーバー状態表示 */}
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-lg border">
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${
+                    forecastServerStatus === 'ready' ? 'bg-green-500' :
+                    forecastServerStatus === 'starting' ? 'bg-yellow-500 animate-pulse' :
+                    forecastServerStatus === 'checking' ? 'bg-blue-500 animate-pulse' :
+                    'bg-red-500'
+                  }`} />
+                  <span className="text-xs font-medium text-gray-700">
+                    {forecastServerStatus === 'ready' ? '予測API: 起動中' :
+                     forecastServerStatus === 'starting' ? '予測API: 起動中...' :
+                     forecastServerStatus === 'checking' ? '予測API: 確認中...' :
+                     '予測API: 停止中'}
+                  </span>
+                </div>
+                {forecastServerStatus === 'unavailable' && (
+                  <button
+                    onClick={startForecastServer}
+                    disabled={isStartingServer}
+                    className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                  >
+                    起動
+                  </button>
+                )}
+              </div>
+
               <div className="flex items-center gap-3">
                 {session.user?.image && (
                   <img
@@ -362,18 +434,29 @@ export default function Dashboard() {
               </button>
 
               <button
-                onClick={() => setActiveTab('forecast')}
+                onClick={() => {
+                  if (forecastServerStatus === 'ready') {
+                    setActiveTab('forecast')
+                  }
+                }}
+                disabled={forecastServerStatus !== 'ready'}
                 className={`py-2 px-1 border-b-2 font-medium text-sm ${
                   activeTab === 'forecast'
                     ? 'border-blue-500 text-blue-600'
+                    : forecastServerStatus !== 'ready'
+                    ? 'border-transparent text-gray-400 cursor-not-allowed'
                     : 'border-transparent text-gray-900 hover:text-gray-900 hover:border-gray-300'
                 }`}
+                title={forecastServerStatus !== 'ready' ? '予測APIが起動していません' : ''}
               >
                 <div className="flex items-center gap-2">
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                   </svg>
                   売上予測
+                  {forecastServerStatus !== 'ready' && (
+                    <span className="text-xs text-gray-400">(要起動)</span>
+                  )}
                 </div>
               </button>
             </nav>
