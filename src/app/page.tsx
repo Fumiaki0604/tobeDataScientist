@@ -52,18 +52,29 @@ export default function Dashboard() {
   }
 
   // Pythonサーバーの状態をチェック
-  const checkForecastServerStatus = useCallback(async () => {
+  const checkForecastServerStatus = useCallback(async (skipIfStarting = false) => {
+    // 起動中の場合はスキップ（起動プロセスを中断しない）
+    if (skipIfStarting && forecastServerStatus === 'starting') {
+      return
+    }
+
     try {
       const response = await fetch('/api/forecast/health', { method: 'GET' })
       if (response.ok) {
         setForecastServerStatus('ready')
       } else {
-        setForecastServerStatus('unavailable')
+        // 起動中でない場合のみunavailableに設定
+        if (forecastServerStatus !== 'starting') {
+          setForecastServerStatus('unavailable')
+        }
       }
     } catch (err) {
-      setForecastServerStatus('unavailable')
+      // 起動中でない場合のみunavailableに設定
+      if (forecastServerStatus !== 'starting') {
+        setForecastServerStatus('unavailable')
+      }
     }
-  }, [])
+  }, [forecastServerStatus])
 
   // Pythonサーバーを起動
   const startForecastServer = async () => {
@@ -76,21 +87,34 @@ export default function Dashboard() {
       if (response.ok && data.status === 'started') {
         setForecastServerStatus('ready')
       } else {
-        // 起動中の場合は30秒後に再チェック
-        setTimeout(checkForecastServerStatus, 30000)
+        // 起動中の場合は10秒後に再チェック（最大3回）
+        let retryCount = 0
+        const checkInterval = setInterval(async () => {
+          retryCount++
+          const checkResponse = await fetch('/api/forecast/health', { method: 'GET' })
+          if (checkResponse.ok) {
+            setForecastServerStatus('ready')
+            clearInterval(checkInterval)
+          } else if (retryCount >= 6) {
+            // 60秒（10秒×6回）経過しても起動しない場合
+            setForecastServerStatus('unavailable')
+            clearInterval(checkInterval)
+          }
+        }, 10000)
       }
     } catch (err) {
-      setTimeout(checkForecastServerStatus, 30000)
+      // エラー時も再チェックを試みる
+      setTimeout(() => checkForecastServerStatus(false), 10000)
     } finally {
       setIsStartingServer(false)
     }
   }
 
-  // 初回マウント時とactiveTabが'forecast'に変更された時にサーバー状態をチェック
+  // 初回マウント時に状態をチェック、その後30秒ごとに定期チェック
   useEffect(() => {
-    checkForecastServerStatus()
-    // 30秒ごとに定期チェック
-    const interval = setInterval(checkForecastServerStatus, 30000)
+    checkForecastServerStatus(false)
+    // 30秒ごとに定期チェック（起動中の場合はスキップ）
+    const interval = setInterval(() => checkForecastServerStatus(true), 30000)
     return () => clearInterval(interval)
   }, [checkForecastServerStatus])
 
@@ -367,7 +391,7 @@ export default function Dashboard() {
                   }`} />
                   <span className="text-xs font-medium text-gray-700">
                     {forecastServerStatus === 'ready' ? '予測API: 起動中' :
-                     forecastServerStatus === 'starting' ? '予測API: 起動中...' :
+                     forecastServerStatus === 'starting' ? '予測API: 起動中...（最大60秒）' :
                      forecastServerStatus === 'checking' ? '予測API: 確認中...' :
                      '予測API: 停止中'}
                   </span>
@@ -377,6 +401,7 @@ export default function Dashboard() {
                     onClick={startForecastServer}
                     disabled={isStartingServer}
                     className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                    title="予測サーバーを起動します（30秒〜60秒かかります）"
                   >
                     起動
                   </button>
