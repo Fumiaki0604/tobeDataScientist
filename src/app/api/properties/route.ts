@@ -35,10 +35,17 @@ export async function GET() {
 
     // 各アカウントのプロパティを取得
     const allProperties = []
+    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
-    for (const account of accounts) {
+    for (let i = 0; i < accounts.length; i++) {
+      const account = accounts[i]
       if (account.name) {
         try {
+          // レート制限を回避するため、リクエスト間に遅延を追加（300ms）
+          if (i > 0) {
+            await delay(300)
+          }
+
           const propertiesResponse = await analyticsAdmin.properties.list({
             filter: `parent:${account.name}`,
             pageSize: 50, // プロパティも最大50件に制限
@@ -60,9 +67,14 @@ export async function GET() {
               })
             }
           }
-        } catch (error) {
+        } catch (error: any) {
+          // レート制限エラー（429）の場合は処理を中断
+          if (error?.code === 429 || error?.status === 429) {
+            console.error(`レート制限エラー: ${account.name}で処理を中断します`)
+            break // これ以上のリクエストを送信しない
+          }
           console.error(`アカウント ${account.name} のプロパティ取得エラー:`, error)
-          // 個別のエラーは無視して続行
+          // その他のエラーは無視して続行
         }
       }
     }

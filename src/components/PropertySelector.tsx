@@ -45,8 +45,9 @@ export default function PropertySelector({ onPropertySelected, selectedPropertyI
       if (result.success) {
         setProperties(result.properties)
 
-        // プロパティ一覧をローカルストレージにキャッシュ
+        // プロパティ一覧をローカルストレージにキャッシュ（タイムスタンプ付き）
         localStorage.setItem('ga4-properties-cache', JSON.stringify(result.properties))
+        localStorage.setItem('ga4-properties-cache-timestamp', Date.now().toString())
 
         // 既に保存されているプロパティIDがあるかチェック（初回ロード時のみ）
         if (!isBackgroundUpdate) {
@@ -90,6 +91,10 @@ export default function PropertySelector({ onPropertySelected, selectedPropertyI
 
     // ローカルストレージからキャッシュされたプロパティを読み込み
     const cachedProperties = localStorage.getItem('ga4-properties-cache')
+    const cacheTimestamp = localStorage.getItem('ga4-properties-cache-timestamp')
+    const cacheAge = cacheTimestamp ? Date.now() - parseInt(cacheTimestamp) : Infinity
+    const CACHE_DURATION = 5 * 60 * 1000 // 5分
+
     if (cachedProperties) {
       try {
         const parsed = JSON.parse(cachedProperties)
@@ -109,8 +114,11 @@ export default function PropertySelector({ onPropertySelected, selectedPropertyI
       }
     }
 
-    // バックグラウンドでプロパティ一覧を更新
-    fetchProperties(true)
+    // キャッシュが5分以上古い場合のみバックグラウンドで更新
+    if (cacheAge > CACHE_DURATION || !cachedProperties) {
+      console.log('PropertySelector: Cache expired or missing, updating in background')
+      fetchProperties(true)
+    }
   }, [fetchProperties, onPropertySelected, selectedPropertyId])
 
   useEffect(() => {
