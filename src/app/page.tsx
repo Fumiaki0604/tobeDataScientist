@@ -45,6 +45,7 @@ export default function Dashboard() {
   const [deviceFilter, setDeviceFilter] = useState('all')
   const [forecastServerStatus, setForecastServerStatus] = useState<'checking' | 'ready' | 'unavailable' | 'starting'>('checking')
   const [isStartingServer, setIsStartingServer] = useState(false)
+  const [forecastServerError, setForecastServerError] = useState('')
 
   const handlePropertySelected = (selectedPropertyId: string) => {
     setPropertyId(selectedPropertyId)
@@ -60,18 +61,23 @@ export default function Dashboard() {
 
     try {
       const response = await fetch('/api/forecast/health', { method: 'GET' })
+      const data = await response.json()
+
       if (response.ok) {
         setForecastServerStatus('ready')
+        setForecastServerError('')
       } else {
         // 起動中でない場合のみunavailableに設定
         if (forecastServerStatus !== 'starting') {
           setForecastServerStatus('unavailable')
+          setForecastServerError(data.error || data.url || '')
         }
       }
     } catch (err) {
       // 起動中でない場合のみunavailableに設定
       if (forecastServerStatus !== 'starting') {
         setForecastServerStatus('unavailable')
+        setForecastServerError(err instanceof Error ? err.message : '')
       }
     }
   }, [forecastServerStatus])
@@ -399,30 +405,37 @@ export default function Dashboard() {
               />
 
               {/* 予測サーバー状態表示 */}
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-lg border">
-                <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${
-                    forecastServerStatus === 'ready' ? 'bg-green-500' :
-                    forecastServerStatus === 'starting' ? 'bg-yellow-500 animate-pulse' :
-                    forecastServerStatus === 'checking' ? 'bg-blue-500 animate-pulse' :
-                    'bg-red-500'
-                  }`} />
-                  <span className="text-xs font-medium text-gray-700">
-                    {forecastServerStatus === 'ready' ? '予測API: 起動中' :
-                     forecastServerStatus === 'starting' ? '予測API: 起動中...（最大2分）' :
-                     forecastServerStatus === 'checking' ? '予測API: 確認中...' :
-                     '予測API: 停止中'}
-                  </span>
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-lg border">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${
+                      forecastServerStatus === 'ready' ? 'bg-green-500' :
+                      forecastServerStatus === 'starting' ? 'bg-yellow-500 animate-pulse' :
+                      forecastServerStatus === 'checking' ? 'bg-blue-500 animate-pulse' :
+                      'bg-red-500'
+                    }`} />
+                    <span className="text-xs font-medium text-gray-700">
+                      {forecastServerStatus === 'ready' ? '予測API: 起動中' :
+                       forecastServerStatus === 'starting' ? '予測API: 起動中...（最大2分）' :
+                       forecastServerStatus === 'checking' ? '予測API: 確認中...' :
+                       '予測API: 停止中'}
+                    </span>
+                  </div>
+                  {forecastServerStatus === 'unavailable' && (
+                    <button
+                      onClick={startForecastServer}
+                      disabled={isStartingServer}
+                      className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                      title="予測サーバーを起動します（60秒〜120秒かかります）"
+                    >
+                      起動
+                    </button>
+                  )}
                 </div>
-                {forecastServerStatus === 'unavailable' && (
-                  <button
-                    onClick={startForecastServer}
-                    disabled={isStartingServer}
-                    className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                    title="予測サーバーを起動します（60秒〜120秒かかります）"
-                  >
-                    起動
-                  </button>
+                {forecastServerError && (
+                  <div className="text-xs text-red-600 px-3">
+                    {forecastServerError}
+                  </div>
                 )}
               </div>
 
