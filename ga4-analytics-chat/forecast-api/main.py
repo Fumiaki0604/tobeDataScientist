@@ -109,11 +109,16 @@ async def create_forecast(request: ForecastRequest):
             interval_width=0.95  # 信頼区間95%
         )
 
+        # 売上は必ず0以上（マイナスにならない）
+        df['floor'] = 0
         model.fit(df)
         logger.info("モデル学習完了")
 
         # 未来の日付を生成
         future = model.make_future_dataframe(periods=request.periods)
+
+        # 予測データにもfloorを設定（売上は0以上）
+        future['floor'] = 0
 
         # 予測実行
         forecast_df = model.predict(future)
@@ -124,9 +129,9 @@ async def create_forecast(request: ForecastRequest):
             {
                 'date': row['ds'].strftime('%Y-%m-%d'),
                 'value': float(row['y']),
-                'predicted': float(forecast_df.loc[idx, 'yhat']),
-                'lower': float(forecast_df.loc[idx, 'yhat_lower']),
-                'upper': float(forecast_df.loc[idx, 'yhat_upper'])
+                'predicted': max(0, float(forecast_df.loc[idx, 'yhat'])),  # マイナス値を0にクリップ
+                'lower': max(0, float(forecast_df.loc[idx, 'yhat_lower'])),
+                'upper': max(0, float(forecast_df.loc[idx, 'yhat_upper']))
             }
             for idx, row in df.iterrows()
         ]
@@ -136,9 +141,9 @@ async def create_forecast(request: ForecastRequest):
         forecast = [
             {
                 'date': row['ds'].strftime('%Y-%m-%d'),
-                'predicted': float(row['yhat']),
-                'lower': float(row['yhat_lower']),
-                'upper': float(row['yhat_upper'])
+                'predicted': max(0, float(row['yhat'])),  # マイナス値を0にクリップ
+                'lower': max(0, float(row['yhat_lower'])),  # 信頼区間下限も0以上
+                'upper': max(0, float(row['yhat_upper']))  # 念のため上限も
             }
             for idx, row in forecast_df.iloc[forecast_start_idx:].iterrows()
         ]
