@@ -19,6 +19,7 @@ export default function ForecastTab({ propertyId, analyticsData }: ForecastTabPr
   const [error, setError] = useState('')
   const [apiStatus, setApiStatus] = useState<'checking' | 'ready' | 'waking'>('checking')
   const [monthlyActualData, setMonthlyActualData] = useState<{ [key: string]: number }>({})
+  const [trainingData, setTrainingData] = useState<Array<{ date: string; totalRevenue: number }>>([])
 
   // 期間の計算
   const calculatePeriods = () => {
@@ -63,9 +64,9 @@ export default function ForecastTab({ propertyId, analyticsData }: ForecastTabPr
     wakeUpApi()
   }, [])
 
-  // 月初から今日までの実績データを取得
+  // 予測用の学習データ（90日間）と月次実績データを取得
   useEffect(() => {
-    const fetchMonthlyActualData = async () => {
+    const fetchTrainingData = async () => {
       if (!propertyId) return
 
       try {
@@ -73,25 +74,38 @@ export default function ForecastTab({ propertyId, analyticsData }: ForecastTabPr
         const currentYear = today.getFullYear()
         const currentMonth = today.getMonth()
 
-        // 今月の月初
-        const startOfCurrentMonth = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`
-        // 先月の月初（来月末まで予測する場合に備えて）
-        const startOfLastMonth = new Date(currentYear, currentMonth - 1, 1)
-        const lastMonthStr = `${startOfLastMonth.getFullYear()}-${String(startOfLastMonth.getMonth() + 1).padStart(2, '0')}-01`
+        // 90日前
+        const startDate90Days = new Date(today)
+        startDate90Days.setDate(today.getDate() - 90)
+        const startDate90DaysStr = startDate90Days.toISOString().split('T')[0]
 
         // 今日
         const todayStr = today.toISOString().split('T')[0]
 
-        // 先月から今日までのデータを取得
+        // 過去90日間のデータを取得（予測用）
         const response = await fetch(
-          `/api/analytics?startDate=${lastMonthStr}&endDate=${todayStr}&metrics=totalRevenue&dimensions=date&propertyId=${propertyId}`
+          `/api/analytics?startDate=${startDate90DaysStr}&endDate=${todayStr}&metrics=totalRevenue&dimensions=date&propertyId=${propertyId}`
         )
 
         if (response.ok) {
           const result = await response.json()
           const data = result.data || []
 
-          // 月別に集計
+          // 日付フォーマットを統一してソート
+          const formattedData = data.map((item: any) => {
+            const dateStr = item.date.length === 8
+              ? `${item.date.substring(0, 4)}-${item.date.substring(4, 6)}-${item.date.substring(6, 8)}`
+              : item.date
+            return {
+              date: dateStr,
+              totalRevenue: item.totalRevenue || 0
+            }
+          }).sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
+
+          setTrainingData(formattedData)
+          console.log(`予測用データ取得: ${formattedData.length}日分 (${startDate90DaysStr} 〜 ${todayStr})`)
+
+          // 月別に集計（月次実績表示用）
           const monthlyData: { [key: string]: number } = {}
           data.forEach((item: any) => {
             const itemDate = new Date(item.date.length === 8
@@ -108,16 +122,16 @@ export default function ForecastTab({ propertyId, analyticsData }: ForecastTabPr
           setMonthlyActualData(monthlyData)
         }
       } catch (err) {
-        console.error('月次実績データの取得に失敗:', err)
+        console.error('予測用データの取得に失敗:', err)
       }
     }
 
-    fetchMonthlyActualData()
+    fetchTrainingData()
   }, [propertyId])
 
   const handleForecast = async () => {
-    if (analyticsData.length < 7) {
-      setError('予測には最低7日分のデータが必要です')
+    if (trainingData.length < 7) {
+      setError('予測には最低7日分のデータが必要です。データを取得中の場合は少々お待ちください。')
       return
     }
 
@@ -127,11 +141,13 @@ export default function ForecastTab({ propertyId, analyticsData }: ForecastTabPr
     try {
       const periods = calculatePeriods()
 
-      // GA4データを予測API用に変換
-      const data = analyticsData.map(item => ({
+      // 予測用の学習データ（90日間）を使用
+      const data = trainingData.map(item => ({
         date: item.date,
         value: item.totalRevenue || 0
       }))
+
+      console.log(`予測実行: ${data.length}日分のデータで学習、${periods}日間予測`)
 
       const response = await fetch('/api/forecast', {
         method: 'POST',
@@ -248,7 +264,7 @@ export default function ForecastTab({ propertyId, analyticsData }: ForecastTabPr
             </div>
             <button
               onClick={handleForecast}
-              disabled={loading || analyticsData.length < 7}
+              disabled={loading || trainingData.length < 7}
               className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
             >
               <Calendar className="h-4 w-4" />
@@ -256,13 +272,20 @@ export default function ForecastTab({ propertyId, analyticsData }: ForecastTabPr
             </button>
           </div>
 
+          {/* 学習データ情報 */}
+          {trainingData.length > 0 && (
+            <div className="text-sm text-gray-600">
+              学習データ: 過去{trainingData.length}日分（{trainingData[0]?.date} 〜 {trainingData[trainingData.length - 1]?.date}）
+            </div>
+          )}
+
           {error && (
             <div className="text-red-600 text-sm">{error}</div>
           )}
 
-          {analyticsData.length < 7 && (
+          {trainingData.length < 7 && trainingData.length > 0 && (
             <div className="text-amber-600 text-sm">
-              ※ 予測を実行するには、最低7日分のデータが必要です
+              ※ 予測を実行するには、最低7日分のデータが必要です（現在: {trainingData.length}日分）
             </div>
           )}
 
