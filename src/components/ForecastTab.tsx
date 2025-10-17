@@ -20,7 +20,7 @@ export default function ForecastTab({ propertyId, analyticsData }: ForecastTabPr
   const [apiStatus, setApiStatus] = useState<'checking' | 'ready' | 'waking'>('checking')
   const [monthlyActualData, setMonthlyActualData] = useState<{ [key: string]: number }>({})
   const [trainingData, setTrainingData] = useState<Array<{ date: string; totalRevenue: number }>>([])
-  const [trainingPeriod, setTrainingPeriod] = useState<90 | 180 | 365 | 730>(365) // デフォルト365日
+  const [trainingPeriod, setTrainingPeriod] = useState<365 | 730>(365) // デフォルト365日
 
   // 期間の計算
   const calculatePeriods = () => {
@@ -208,15 +208,31 @@ export default function ForecastTab({ propertyId, analyticsData }: ForecastTabPr
   const calculateMonthlySales = () => {
     if (!forecastData) return []
 
+    const today = new Date()
+    const currentYear = today.getFullYear()
+    const currentMonth = today.getMonth()
+
+    // 予測期間に応じて表示する月を決定
+    const targetMonths = new Set<string>()
+    const currentMonthKey = `${currentYear}/${String(currentMonth + 1).padStart(2, '0')}`
+    targetMonths.add(currentMonthKey)
+
+    if (periodType === 'next_month') {
+      const nextMonthKey = `${currentMonth === 11 ? currentYear + 1 : currentYear}/${String((currentMonth + 2) % 12 || 12).padStart(2, '0')}`
+      targetMonths.add(nextMonthKey)
+    }
+
     // 月別に集計
     const monthlyData: { [key: string]: { actual: number, forecast: number } } = {}
 
     // 月初からの実績データを使用
     Object.entries(monthlyActualData).forEach(([monthKey, actualRevenue]) => {
-      if (!monthlyData[monthKey]) {
-        monthlyData[monthKey] = { actual: 0, forecast: 0 }
+      if (targetMonths.has(monthKey)) {
+        if (!monthlyData[monthKey]) {
+          monthlyData[monthKey] = { actual: 0, forecast: 0 }
+        }
+        monthlyData[monthKey].actual = actualRevenue
       }
-      monthlyData[monthKey].actual = actualRevenue
     })
 
     // 予測データの集計
@@ -224,19 +240,24 @@ export default function ForecastTab({ propertyId, analyticsData }: ForecastTabPr
       const itemDate = new Date(item.date)
       const monthKey = `${itemDate.getFullYear()}/${String(itemDate.getMonth() + 1).padStart(2, '0')}`
 
-      if (!monthlyData[monthKey]) {
-        monthlyData[monthKey] = { actual: 0, forecast: 0 }
+      if (targetMonths.has(monthKey)) {
+        if (!monthlyData[monthKey]) {
+          monthlyData[monthKey] = { actual: 0, forecast: 0 }
+        }
+        monthlyData[monthKey].forecast += item.predicted
       }
-      monthlyData[monthKey].forecast += item.predicted
     })
 
     // 結果を配列に変換して返す
-    return Object.entries(monthlyData).map(([month, data]) => ({
-      month,
-      actual: data.actual,
-      forecast: data.forecast,
-      total: data.actual + data.forecast
-    })).sort((a, b) => a.month.localeCompare(b.month))
+    return Object.entries(monthlyData)
+      .filter(([month]) => targetMonths.has(month))
+      .map(([month, data]) => ({
+        month,
+        actual: data.actual,
+        forecast: data.forecast,
+        total: data.actual + data.forecast
+      }))
+      .sort((a, b) => a.month.localeCompare(b.month))
   }
 
   const monthlySales = calculateMonthlySales()
@@ -258,11 +279,9 @@ export default function ForecastTab({ propertyId, analyticsData }: ForecastTabPr
               </label>
               <select
                 value={trainingPeriod}
-                onChange={(e) => setTrainingPeriod(Number(e.target.value) as 90 | 180 | 365 | 730)}
+                onChange={(e) => setTrainingPeriod(Number(e.target.value) as 365 | 730)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
-                <option value="90">過去90日間</option>
-                <option value="180">過去180日間（半年、季節性考慮）</option>
                 <option value="365">過去365日間（1年、推奨）</option>
                 <option value="730">過去730日間（2年）</option>
               </select>
@@ -292,7 +311,7 @@ export default function ForecastTab({ propertyId, analyticsData }: ForecastTabPr
 
           {/* 学習データ情報 */}
           {trainingData.length > 0 && (
-            <div className="text-sm text-gray-600">
+            <div className="text-sm text-gray-900 font-medium">
               学習データ: 過去{trainingData.length}日分（{trainingData[0]?.date} 〜 {trainingData[trainingData.length - 1]?.date}）
             </div>
           )}
