@@ -86,50 +86,64 @@ export default function Dashboard() {
   const startForecastServer = async () => {
     setIsStartingServer(true)
     setForecastServerStatus('starting')
+    setForecastServerError('')
+
     try {
+      console.log('予測サーバー起動リクエスト送信...')
       const response = await fetch('/api/forecast/health', { method: 'POST' })
       const data = await response.json()
 
-      if (response.ok && data.status === 'started') {
+      if (data.status === 'started') {
+        console.log('予測サーバーが即座に起動しました')
         setForecastServerStatus('ready')
         setIsStartingServer(false)
-      } else {
-        // 起動中の場合は10秒後に再チェック（最大12回=120秒）
-        let retryCount = 0
-        const maxRetries = 12
-        const checkInterval = setInterval(async () => {
-          retryCount++
-          console.log(`予測サーバー起動チェック: ${retryCount}/${maxRetries}`)
-
-          try {
-            const checkResponse = await fetch('/api/forecast/health', { method: 'GET' })
-            if (checkResponse.ok) {
-              console.log('予測サーバー起動成功')
-              setForecastServerStatus('ready')
-              clearInterval(checkInterval)
-              setIsStartingServer(false)
-            } else if (retryCount >= maxRetries) {
-              // 120秒（10秒×12回）経過しても起動しない場合
-              console.log('予測サーバー起動タイムアウト')
-              setForecastServerStatus('unavailable')
-              clearInterval(checkInterval)
-              setIsStartingServer(false)
-            }
-          } catch (error) {
-            console.log(`起動チェックエラー (${retryCount}/${maxRetries}):`, error)
-            if (retryCount >= maxRetries) {
-              setForecastServerStatus('unavailable')
-              clearInterval(checkInterval)
-              setIsStartingServer(false)
-            }
-          }
-        }, 10000)
+        return
       }
+
+      // 起動中の場合は5秒後から定期チェック開始（最大18回=90秒）
+      console.log('予測サーバー起動中、定期チェック開始...')
+      let retryCount = 0
+      const maxRetries = 18
+      const retryInterval = 5000 // 5秒間隔
+
+      const checkInterval = setInterval(async () => {
+        retryCount++
+        console.log(`予測サーバー起動チェック: ${retryCount}/${maxRetries}`)
+
+        try {
+          const checkResponse = await fetch('/api/forecast/health', { method: 'GET' })
+          const checkData = await checkResponse.json()
+
+          if (checkResponse.ok && checkData.status === 'ready') {
+            console.log('予測サーバー起動成功！')
+            setForecastServerStatus('ready')
+            setForecastServerError('')
+            clearInterval(checkInterval)
+            setIsStartingServer(false)
+          } else if (retryCount >= maxRetries) {
+            // 90秒（5秒×18回）経過しても起動しない場合
+            console.error('予測サーバー起動タイムアウト')
+            setForecastServerStatus('unavailable')
+            setForecastServerError('サーバーの起動に時間がかかっています。しばらく待ってから再度お試しください。')
+            clearInterval(checkInterval)
+            setIsStartingServer(false)
+          }
+        } catch (error) {
+          console.log(`起動チェックエラー (${retryCount}/${maxRetries}):`, error)
+          if (retryCount >= maxRetries) {
+            console.error('予測サーバー起動失敗')
+            setForecastServerStatus('unavailable')
+            setForecastServerError('サーバーの起動に失敗しました。時間をおいて再度お試しください。')
+            clearInterval(checkInterval)
+            setIsStartingServer(false)
+          }
+        }
+      }, retryInterval)
+
     } catch (err) {
-      console.error('予測サーバー起動エラー:', err)
-      // エラー時も再チェックを試みる
-      setForecastServerStatus('starting')
-      setTimeout(() => checkForecastServerStatus(false), 10000)
+      console.error('予測サーバー起動リクエストエラー:', err)
+      setForecastServerStatus('unavailable')
+      setForecastServerError('起動リクエストの送信に失敗しました。')
       setIsStartingServer(false)
     }
   }
