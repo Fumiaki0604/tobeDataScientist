@@ -93,16 +93,20 @@ export default function PropertySelector({ onPropertySelected, selectedPropertyI
     const cachedProperties = localStorage.getItem('ga4-properties-cache')
     const cacheTimestamp = localStorage.getItem('ga4-properties-cache-timestamp')
     const cacheAge = cacheTimestamp ? Date.now() - parseInt(cacheTimestamp) : Infinity
-    const CACHE_DURATION = 5 * 60 * 1000 // 5分
+    const CACHE_DURATION = 30 * 60 * 1000 // 30分に延長（頻繁な再取得を防ぐ）
 
     if (cachedProperties) {
       try {
         const parsed = JSON.parse(cachedProperties)
-        setProperties(parsed)
+
+        // プロパティリストが空か、キャッシュと異なる場合のみ更新
+        if (properties.length === 0) {
+          setProperties(parsed)
+        }
 
         // 既に保存されているプロパティIDがあるかチェック
         const savedPropertyId = localStorage.getItem('ga4-property-id')
-        if (savedPropertyId) {
+        if (savedPropertyId && !selectedProperty) {
           const savedProperty = parsed.find((p: Property) => p.id === savedPropertyId)
           if (savedProperty) {
             setSelectedProperty(savedProperty)
@@ -114,12 +118,13 @@ export default function PropertySelector({ onPropertySelected, selectedPropertyI
       }
     }
 
-    // キャッシュが5分以上古い場合のみバックグラウンドで更新
-    if (cacheAge > CACHE_DURATION || !cachedProperties) {
+    // キャッシュが30分以上古い場合、またはキャッシュがない場合のみバックグラウンドで更新
+    if ((cacheAge > CACHE_DURATION || !cachedProperties) && !isUpdating) {
       console.log('PropertySelector: Cache expired or missing, updating in background')
       fetchProperties(true)
     }
-  }, [fetchProperties, onPropertySelected, selectedPropertyId])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // 初回マウント時のみ実行
 
   useEffect(() => {
     if (selectedPropertyId && properties.length > 0) {
