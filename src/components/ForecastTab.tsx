@@ -177,26 +177,44 @@ export default function ForecastTab({ propertyId, analyticsData }: ForecastTabPr
     }
   }
 
-  // グラフ用データの結合
+  // グラフ用データの結合（予測期間に応じてフィルタリング）
   const chartData = forecastData
-    ? [
-        ...forecastData.historical.map((item: any) => ({
-          date: item.date,
-          actual: item.value,
-          predicted: item.predicted,
-          lower: item.lower,
-          upper: item.upper,
-          isForecast: false
-        })),
-        ...forecastData.forecast.map((item: any) => ({
-          date: item.date,
-          actual: null,
-          predicted: item.predicted,
-          lower: item.lower,
-          upper: item.upper,
-          isForecast: true
-        }))
-      ]
+    ? (() => {
+        const today = new Date()
+        const currentYear = today.getFullYear()
+        const currentMonth = today.getMonth()
+
+        // 表示する月の範囲を決定
+        const startOfCurrentMonth = new Date(currentYear, currentMonth, 1)
+        const endOfTargetMonth = periodType === 'current_month'
+          ? new Date(currentYear, currentMonth + 1, 0) // 今月末
+          : new Date(currentYear, currentMonth + 2, 0) // 来月末
+
+        const allData = [
+          ...forecastData.historical.map((item: any) => ({
+            date: item.date,
+            actual: item.value,
+            predicted: item.predicted,
+            lower: item.lower,
+            upper: item.upper,
+            isForecast: false
+          })),
+          ...forecastData.forecast.map((item: any) => ({
+            date: item.date,
+            actual: null,
+            predicted: item.predicted,
+            lower: item.lower,
+            upper: item.upper,
+            isForecast: true
+          }))
+        ]
+
+        // 今月初日以降のデータのみ表示
+        return allData.filter(item => {
+          const itemDate = new Date(item.date)
+          return itemDate >= startOfCurrentMonth && itemDate <= endOfTargetMonth
+        })
+      })()
     : []
 
   // 予測期間の売上合計

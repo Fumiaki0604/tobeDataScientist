@@ -27,11 +27,25 @@ export async function GET() {
       auth: oauth2Client,
     })
 
-    // アカウント一覧を取得（最大50件に制限）
-    const accountsResponse = await analyticsAdmin.accounts.list({
-      pageSize: 50,
-    })
-    const accounts = accountsResponse.data.accounts || []
+    // アカウント一覧を取得（ページネーション対応）
+    const accounts = []
+    let nextPageToken: string | null | undefined = undefined
+
+    do {
+      const accountsResponse = await analyticsAdmin.accounts.list({
+        pageSize: 200,
+        pageToken: nextPageToken || undefined,
+      })
+
+      if (accountsResponse.data.accounts) {
+        accounts.push(...accountsResponse.data.accounts)
+      }
+
+      nextPageToken = accountsResponse.data.nextPageToken
+      console.log(`アカウント取得: ${accountsResponse.data.accounts?.length || 0}件, 次ページ: ${!!nextPageToken}`)
+    } while (nextPageToken)
+
+    console.log(`総アカウント数: ${accounts.length}件`)
 
     // 各アカウントのプロパティを取得
     const allProperties = []
@@ -46,27 +60,39 @@ export async function GET() {
             await delay(300)
           }
 
-          const propertiesResponse = await analyticsAdmin.properties.list({
-            filter: `parent:${account.name}`,
-            pageSize: 50, // プロパティも最大50件に制限
-          })
+          // プロパティもページネーション対応
+          let propertyPageToken: string | null | undefined = undefined
+          let accountPropertyCount = 0
 
-          const properties = propertiesResponse.data.properties || []
+          do {
+            const propertiesResponse = await analyticsAdmin.properties.list({
+              filter: `parent:${account.name}`,
+              pageSize: 200,
+              pageToken: propertyPageToken || undefined,
+            })
 
-          for (const property of properties) {
-            if (property.name && property.displayName) {
-              // プロパティIDを抽出（例: "properties/123456789" → "123456789"）
-              const propertyId = property.name.split('/').pop()
+            const properties = propertiesResponse.data.properties || []
+            accountPropertyCount += properties.length
 
-              allProperties.push({
-                id: propertyId,
-                name: property.displayName,
-                websiteUrl: (property as any).websiteUrl || '',
-                accountName: account.displayName || '',
-                propertyType: property.propertyType || 'PROPERTY_TYPE_ORDINARY',
-              })
+            for (const property of properties) {
+              if (property.name && property.displayName) {
+                // プロパティIDを抽出（例: "properties/123456789" → "123456789"）
+                const propertyId = property.name.split('/').pop()
+
+                allProperties.push({
+                  id: propertyId,
+                  name: property.displayName,
+                  websiteUrl: (property as any).websiteUrl || '',
+                  accountName: account.displayName || '',
+                  propertyType: property.propertyType || 'PROPERTY_TYPE_ORDINARY',
+                })
+              }
             }
-          }
+
+            propertyPageToken = propertiesResponse.data.nextPageToken
+          } while (propertyPageToken)
+
+          console.log(`アカウント ${account.displayName}: ${accountPropertyCount}件のプロパティ取得`)
         } catch (error: any) {
           // レート制限エラー（429）の場合は処理を中断
           if (error?.code === 429 || error?.status === 429) {
@@ -83,6 +109,8 @@ export async function GET() {
     const ga4Properties = allProperties.filter(
       prop => prop.propertyType === 'PROPERTY_TYPE_ORDINARY'
     )
+
+    console.log(`総プロパティ数: ${allProperties.length}件, GA4プロパティ: ${ga4Properties.length}件`)
 
     return NextResponse.json({
       success: true,
