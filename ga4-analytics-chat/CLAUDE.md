@@ -183,15 +183,32 @@ Next.jsアプリケーションには`.env.local`が必要です（`.env.example
   - `POST /forecast`: 時系列予測実行
 
 **予測フロー**:
-1. Next.jsから過去のGA4売上データ（`date`, `value`）を受信
-2. Prophetモデルを作成・学習（日次・週次季節性を考慮）
-3. 指定期間（デフォルト30日）の予測を実行
-4. 予測値・信頼区間（95%）・過去データとのフィットを返却
+1. Next.jsから過去365日または730日のGA4売上データ（`date`, `value`）を受信
+2. データ期間を計算し、180日以上の場合は年次季節性を自動有効化
+3. Prophetモデルを作成・学習（日次・週次・年次季節性、floor=0制約付き）
+4. 指定期間（デフォルト30日）の予測を実行
+5. 予測値・信頼区間（95%）・過去データとのフィットを返却（すべて0以上にクリップ）
+
+**季節性自動調整** (`main.py:103-113`):
+```python
+data_days = (df['ds'].max() - df['ds'].min()).days
+enable_yearly = data_days >= 180  # 半年以上で年次季節性ON
+
+model = Prophet(
+    daily_seasonality=True,
+    weekly_seasonality=True,
+    yearly_seasonality=enable_yearly,  # 自動調整
+    changepoint_prior_scale=0.05,
+    interval_width=0.95
+)
+df['floor'] = 0  # 売上はマイナスにならない
+```
 
 **注意点**:
 - 最低7日分のデータが必要（Prophetの制限）
 - Render無料プランでは15分間アクセスがないとスリープモード
 - 初回起動に30秒〜1分かかる場合あり
+- マイナス値は自動的に0にクリップされる
 
 ## タブ別機能説明
 
@@ -209,19 +226,48 @@ Next.jsアプリケーションには`.env.local`が必要です（`.env.example
 ### 3. 売上予測タブ
 - **Prophet予測**: Meta社の時系列予測ライブラリを使用
 - **予測対象**: 売上（totalRevenue）
+- **学習期間**: 365日（1年、推奨）/ 730日（2年）から選択可能
+  - 180日以上のデータで年次季節性を自動有効化（Python側で自動判定）
 - **予測期間**: 今月末まで / 来月末まで（動的計算）
 - **表示内容**:
   - 予測グラフ（実績＝緑線、予測＝青点線、信頼区間＝薄青範囲）
   - 月別売上予測テーブル（実績・予測・合計）
+    - 今月末まで予測: 当月のみ表示
+    - 来月末まで予測: 当月と来月のみ表示
   - 予測期間の売上合計、1日あたり平均
 - **サーバー状態管理**:
   - ヘッダーに予測APIサーバー状態インジケーター表示
   - サーバー停止時は「起動」ボタン表示、タブはグレーアウト
-  - 30秒ごとに自動状態チェック
+  - 起動中は最大2分間リトライ（10秒間隔×12回）
 
 ## デプロイ
-- **プラットフォーム**: Render
-- **自動デプロイ**: masterブランチへのpush時
-- **Next.js**: `npm run build` (Turbopack使用)
-- **Forecast API**: `pip install -r requirements.txt` → `uvicorn main:app --host 0.0.0.0 --port $PORT`
-- **環境変数**: `FORECAST_API_URL`にPythonサーバーのURLを設定
+
+### Render設定
+
+#### Next.js Web App
+- **Repository**: `https://github.com/Fumiaki0604/GA4AnalyticsDashboard`
+- **Branch**: `master`
+- **Root Directory**: `ga4-analytics-chat/nextjs-project`
+- **Build Command**: `npm run build`
+- **Start Command**: `npm start`
+- **環境変数**:
+  - `NEXTAUTH_URL`: 本番URL
+  - `NEXTAUTH_SECRET`: ランダム文字列
+  - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`
+  - `OPENAI_API_KEY`
+  - `FORECAST_API_URL`: `https://ga4-forecast-api.onrender.com`
+
+#### Forecast API (Python)
+- **Repository**: `https://github.com/Fumiaki0604/GA4AnalyticsDashboard`
+- **Branch**: `master`
+- **Root Directory**: `ga4-analytics-chat/forecast-api` ⚠️ **重要**: パスは2階層必要
+- **Build Command**: `pip install -r requirements.txt`
+- **Start Command**: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+- **Health Check Path**: `/health`（推奨）
+- **Python Version**: 3.11以上
+
+**トラブルシューティング**:
+- Root Directoryエラーが出る場合、GitHubリポジトリ構造を確認
+  - リポジトリルート → `ga4-analytics-chat/` → `forecast-api/`
+  - Render UIではRoot Directory入力欄に `forecast-api/` というプレフィックスが表示されますが、これはRenderの仕様です
+- ビルドキャッシュクリア: Manual Deploy → Clear build cache & deploy
