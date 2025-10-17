@@ -100,11 +100,17 @@ async def create_forecast(request: ForecastRequest):
         logger.info(f"データ範囲: {df['ds'].min()} ~ {df['ds'].max()}")
         logger.info(f"値の範囲: {df['y'].min()} ~ {df['y'].max()}")
 
+        # データ期間に応じて年次季節性を自動調整
+        data_days = (df['ds'].max() - df['ds'].min()).days
+        enable_yearly = data_days >= 180  # 半年以上のデータがあれば年次季節性を有効化
+
+        logger.info(f"データ期間: {data_days}日, 年次季節性: {'有効' if enable_yearly else '無効'}")
+
         # Prophetモデルの作成と学習
         model = Prophet(
             daily_seasonality=True,
             weekly_seasonality=True,
-            yearly_seasonality=False,  # データ期間が短い場合は無効化
+            yearly_seasonality=enable_yearly,  # データ期間に応じて自動調整
             changepoint_prior_scale=0.05,  # トレンドの柔軟性
             interval_width=0.95  # 信頼区間95%
         )
