@@ -20,6 +20,7 @@ export default function ForecastTab({ propertyId, analyticsData }: ForecastTabPr
   const [apiStatus, setApiStatus] = useState<'checking' | 'ready' | 'waking'>('checking')
   const [monthlyActualData, setMonthlyActualData] = useState<{ [key: string]: number }>({})
   const [trainingData, setTrainingData] = useState<Array<{ date: string; totalRevenue: number }>>([])
+  const [trainingPeriod, setTrainingPeriod] = useState<90 | 180 | 365 | 730>(365) // デフォルト365日
 
   // 期間の計算
   const calculatePeriods = () => {
@@ -64,7 +65,7 @@ export default function ForecastTab({ propertyId, analyticsData }: ForecastTabPr
     wakeUpApi()
   }, [])
 
-  // 予測用の学習データ（90日間）と月次実績データを取得
+  // 予測用の学習データと月次実績データを取得
   useEffect(() => {
     const fetchTrainingData = async () => {
       if (!propertyId) return
@@ -74,17 +75,19 @@ export default function ForecastTab({ propertyId, analyticsData }: ForecastTabPr
         const currentYear = today.getFullYear()
         const currentMonth = today.getMonth()
 
-        // 90日前
-        const startDate90Days = new Date(today)
-        startDate90Days.setDate(today.getDate() - 90)
-        const startDate90DaysStr = startDate90Days.toISOString().split('T')[0]
+        // 指定された日数前
+        const startDate = new Date(today)
+        startDate.setDate(today.getDate() - trainingPeriod)
+        const startDateStr = startDate.toISOString().split('T')[0]
 
         // 今日
         const todayStr = today.toISOString().split('T')[0]
 
-        // 過去90日間のデータを取得（予測用）
+        console.log(`学習データ取得開始: ${trainingPeriod}日間 (${startDateStr} 〜 ${todayStr})`)
+
+        // 過去のデータを取得（予測用）
         const response = await fetch(
-          `/api/analytics?startDate=${startDate90DaysStr}&endDate=${todayStr}&metrics=totalRevenue&dimensions=date&propertyId=${propertyId}`
+          `/api/analytics?startDate=${startDateStr}&endDate=${todayStr}&metrics=totalRevenue&dimensions=date&propertyId=${propertyId}`
         )
 
         if (response.ok) {
@@ -103,7 +106,7 @@ export default function ForecastTab({ propertyId, analyticsData }: ForecastTabPr
           }).sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
 
           setTrainingData(formattedData)
-          console.log(`予測用データ取得: ${formattedData.length}日分 (${startDate90DaysStr} 〜 ${todayStr})`)
+          console.log(`予測用データ取得完了: ${formattedData.length}日分`)
 
           // 月別に集計（月次実績表示用）
           const monthlyData: { [key: string]: number } = {}
@@ -127,7 +130,7 @@ export default function ForecastTab({ propertyId, analyticsData }: ForecastTabPr
     }
 
     fetchTrainingData()
-  }, [propertyId])
+  }, [propertyId, trainingPeriod]) // trainingPeriod変更時も再取得
 
   const handleForecast = async () => {
     if (trainingData.length < 7) {
@@ -249,6 +252,21 @@ export default function ForecastTab({ propertyId, analyticsData }: ForecastTabPr
 
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row gap-4 items-end">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                学習期間
+              </label>
+              <select
+                value={trainingPeriod}
+                onChange={(e) => setTrainingPeriod(Number(e.target.value) as 90 | 180 | 365 | 730)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="90">過去90日間</option>
+                <option value="180">過去180日間（半年、季節性考慮）</option>
+                <option value="365">過去365日間（1年、推奨）</option>
+                <option value="730">過去730日間（2年）</option>
+              </select>
+            </div>
             <div className="flex-1">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 予測期間
