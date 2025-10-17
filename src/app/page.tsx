@@ -100,38 +100,39 @@ export default function Dashboard() {
         return
       }
 
-      // 起動中の場合は5秒後から定期チェック開始（最大18回=90秒）
-      console.log('予測サーバー起動中、定期チェック開始...')
+      // 起動中の場合は5秒後から定期チェック開始（最大60回=5分）
+      console.log('予測サーバー起動中、定期チェック開始（最大5分）...')
       let retryCount = 0
-      const maxRetries = 18
+      const maxRetries = 60 // 5分間リトライ
       const retryInterval = 5000 // 5秒間隔
 
       const checkInterval = setInterval(async () => {
         retryCount++
-        console.log(`予測サーバー起動チェック: ${retryCount}/${maxRetries}`)
+        const elapsed = Math.floor((retryCount * retryInterval) / 1000)
+        console.log(`予測サーバー起動チェック: ${retryCount}/${maxRetries} (${elapsed}秒経過)`)
 
         try {
           const checkResponse = await fetch('/api/forecast/health', { method: 'GET' })
           const checkData = await checkResponse.json()
 
           if (checkResponse.ok && checkData.status === 'ready') {
-            console.log('予測サーバー起動成功！')
+            console.log(`予測サーバー起動成功！(${elapsed}秒で起動完了)`)
             setForecastServerStatus('ready')
             setForecastServerError('')
             clearInterval(checkInterval)
             setIsStartingServer(false)
           } else if (retryCount >= maxRetries) {
-            // 90秒（5秒×18回）経過しても起動しない場合
-            console.error('予測サーバー起動タイムアウト')
+            // 5分（5秒×60回）経過しても起動しない場合
+            console.error('予測サーバー起動タイムアウト（5分経過）')
             setForecastServerStatus('unavailable')
-            setForecastServerError('サーバーの起動に時間がかかっています。しばらく待ってから再度お試しください。')
+            setForecastServerError('サーバーの起動に失敗しました（5分経過）。Renderダッシュボードでサーバーの状態を確認してください。')
             clearInterval(checkInterval)
             setIsStartingServer(false)
           }
         } catch (error) {
           console.log(`起動チェックエラー (${retryCount}/${maxRetries}):`, error)
           if (retryCount >= maxRetries) {
-            console.error('予測サーバー起動失敗')
+            console.error('予測サーバー起動失敗（5分経過）')
             setForecastServerStatus('unavailable')
             setForecastServerError('サーバーの起動に失敗しました。時間をおいて再度お試しください。')
             clearInterval(checkInterval)
