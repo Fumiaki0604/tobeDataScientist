@@ -958,7 +958,6 @@ export default function Dashboard() {
         <div className={activeTab === 'forecast' ? '' : 'hidden'}>
           <ForecastTab
             propertyId={propertyId}
-            analyticsData={analyticsData}
           />
         </div>
       </main>

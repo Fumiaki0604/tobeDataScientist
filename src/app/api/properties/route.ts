@@ -28,11 +28,11 @@ export async function GET() {
     })
 
     // アカウント一覧を取得（ページネーション対応）
-    const accounts = []
+    const accounts: any[] = []
     let nextPageToken: string | null | undefined = undefined
 
     do {
-      const accountsResponse = await analyticsAdmin.accounts.list({
+      const accountsResponse: any = await analyticsAdmin.accounts.list({
         pageSize: 200,
         pageToken: nextPageToken || undefined,
       })
@@ -65,7 +65,7 @@ export async function GET() {
           let accountPropertyCount = 0
 
           do {
-            const propertiesResponse = await analyticsAdmin.properties.list({
+            const propertiesResponse: any = await analyticsAdmin.properties.list({
               filter: `parent:${account.name}`,
               pageSize: 200,
               pageToken: propertyPageToken || undefined,

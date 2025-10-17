@@ -1,18 +1,14 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Area, AreaChart } from 'recharts'
+import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Area, AreaChart } from 'recharts'
 import { TrendingUp, Calendar, DollarSign } from 'lucide-react'
 
 interface ForecastTabProps {
   propertyId: string
-  analyticsData: Array<{
-    date: string
-    totalRevenue: number
-  }>
 }
 
-export default function ForecastTab({ propertyId, analyticsData }: ForecastTabProps) {
+export default function ForecastTab({ propertyId }: ForecastTabProps) {
   const [forecastData, setForecastData] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [periodType, setPeriodType] = useState<'current_month' | 'next_month'>('current_month')
@@ -58,7 +54,7 @@ export default function ForecastTab({ propertyId, analyticsData }: ForecastTabPr
             })
           }, 30000)
         }
-      } catch (err) {
+      } catch {
         setApiStatus('waking')
       }
     }
@@ -72,8 +68,6 @@ export default function ForecastTab({ propertyId, analyticsData }: ForecastTabPr
 
       try {
         const today = new Date()
-        const currentYear = today.getFullYear()
-        const currentMonth = today.getMonth()
 
         // 指定された日数前
         const startDate = new Date(today)
