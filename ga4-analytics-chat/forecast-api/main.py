@@ -108,10 +108,12 @@ async def create_forecast(request: ForecastRequest):
 
         # Prophetモデルの作成と学習
         model = Prophet(
-            daily_seasonality=True,
-            weekly_seasonality=True,
+            daily_seasonality=False,  # 日次季節性は無効（ECサイトには不要、ノイズになる）
+            weekly_seasonality=True,  # 週次季節性（週末効果など）
             yearly_seasonality=enable_yearly,  # データ期間に応じて自動調整
-            changepoint_prior_scale=0.05,  # トレンドの柔軟性
+            changepoint_prior_scale=0.15,  # トレンドの柔軟性を向上（デフォルト0.05→0.15）
+            seasonality_prior_scale=10.0,  # 季節性の強度を向上（デフォルト10.0）
+            changepoint_range=0.9,  # トレンド変化点を検出する範囲（最新のトレンドも考慮）
             interval_width=0.95  # 信頼区間95%
         )
 
