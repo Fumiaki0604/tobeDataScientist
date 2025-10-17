@@ -32,12 +32,16 @@ export async function GET() {
 export async function POST() {
   try {
     console.log(`[Health Check POST] Waking up: ${FORECAST_API_URL}/health`)
+    console.log(`[Health Check POST] Environment: FORECAST_API_URL=${FORECAST_API_URL}`)
 
     // まず短いタイムアウトで試行（5秒）
     const quickCheck = await fetch(`${FORECAST_API_URL}/health`, {
       method: 'GET',
       signal: AbortSignal.timeout(5000),
-    }).catch(() => null)
+    }).catch((err) => {
+      console.log(`[Health Check POST] Quick check failed (expected if sleeping):`, err.message)
+      return null
+    })
 
     // すぐに応答があれば成功
     if (quickCheck?.ok) {
@@ -46,15 +50,15 @@ export async function POST() {
       return NextResponse.json({ status: 'started', ...data })
     }
 
-    console.log(`[Health Check POST] Server not ready, triggering wake-up...`)
+    console.log(`[Health Check POST] Server not ready, triggering wake-up with long timeout...`)
 
     // サーバーがまだ起動していない場合は、起動リクエストを送信
-    // タイムアウトは長めに設定するが、エラーでも「starting」を返す
+    // タイムアウトを120秒に延長（Renderの起動時間を考慮）
     const response = await fetch(`${FORECAST_API_URL}/health`, {
       method: 'GET',
-      signal: AbortSignal.timeout(90000), // 90秒
+      signal: AbortSignal.timeout(120000), // 120秒
     }).catch((error) => {
-      console.log(`[Health Check POST] Timeout/Error (expected):`, error.message)
+      console.log(`[Health Check POST] Long timeout/Error (may succeed later):`, error.message)
       return null
     })
 
@@ -66,17 +70,25 @@ export async function POST() {
 
     // タイムアウトまたはエラーの場合も「starting」として扱う
     // Renderは起動プロセスを開始している可能性が高い
-    console.log(`[Health Check POST] Wake-up signal sent, server starting...`)
+    console.log(`[Health Check POST] Wake-up signal sent (timeout), but server may be starting. Client will retry.`)
     return NextResponse.json({
       status: 'starting',
-      message: 'サーバー起動リクエストを送信しました。1〜2分お待ちください。',
+      message: 'サーバー起動リクエストを送信しました。2〜3分お待ちください。',
+      debugInfo: {
+        apiUrl: FORECAST_API_URL,
+        timestamp: new Date().toISOString()
+      }
     }, { status: 200 }) // 200を返してリトライロジックを発動
   } catch (error) {
     console.error(`[Health Check POST] Unexpected error:`, error)
     return NextResponse.json({
       status: 'starting',
-      message: 'サーバー起動リクエストを送信しました。1〜2分お待ちください。',
+      message: 'サーバー起動リクエストを送信しました。2〜3分お待ちください。',
       error: error instanceof Error ? error.message : 'Unknown error',
+      debugInfo: {
+        apiUrl: FORECAST_API_URL,
+        timestamp: new Date().toISOString()
+      }
     }, { status: 200 }) // 200を返してリトライロジックを発動
   }
 }
