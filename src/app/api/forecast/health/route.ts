@@ -5,10 +5,10 @@ const FORECAST_API_URL = process.env.FORECAST_API_URL || 'http://localhost:8000'
 export async function GET() {
   try {
     console.log(`[Health Check GET] Checking: ${FORECAST_API_URL}/health`)
-    // タイムアウトを60秒に延長（Renderの起動を待つため）
+    // タイムアウトを90秒に延長（Renderの起動を待つため）
     const response = await fetch(`${FORECAST_API_URL}/health`, {
       method: 'GET',
-      signal: AbortSignal.timeout(60000), // 60秒でタイムアウト
+      signal: AbortSignal.timeout(90000), // 90秒でタイムアウト
     })
 
     console.log(`[Health Check GET] Response: ${response.status} ${response.statusText}`)
