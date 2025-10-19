@@ -379,11 +379,12 @@ export default function Dashboard() {
   }, [session, propertyId, dateRange, customStartDate, customEndDate, deviceFilter])
 
   useEffect(() => {
-    // データが既に存在する場合は再取得しない（タブ切り替え時の再読み込みを防ぐ）
-    if (session && propertyId && (activeTab === 'dashboard' || activeTab === 'forecast') && analyticsData.length === 0) {
+    // タブがdashboardまたはforecastの場合にデータを取得
+    // 日付範囲やデバイスフィルターが変更された場合も再取得
+    if (session && propertyId && (activeTab === 'dashboard' || activeTab === 'forecast')) {
       fetchAnalyticsData()
     }
-  }, [session, propertyId, fetchAnalyticsData, activeTab, analyticsData.length])
+  }, [session, propertyId, fetchAnalyticsData, activeTab, dateRange, customStartDate, customEndDate, deviceFilter])
 
   if (status === 'loading') {
     return (
