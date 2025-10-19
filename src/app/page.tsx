@@ -212,6 +212,25 @@ export default function Dashboard() {
       return
     }
 
+    // キャッシュキーを生成（プロパティID、日付範囲、デバイスフィルターを含む）
+    const cacheKey = `ga4-analytics-${propertyId}-${startDate}-${endDate}-${deviceFilter}`
+    const cacheTimestampKey = `${cacheKey}-timestamp`
+    const CACHE_DURATION = 5 * 60 * 1000 // 5分間
+
+    // キャッシュをチェック
+    const cachedData = localStorage.getItem(cacheKey)
+    const cacheTimestamp = localStorage.getItem(cacheTimestampKey)
+    const cacheAge = cacheTimestamp ? Date.now() - parseInt(cacheTimestamp) : Infinity
+
+    if (cachedData && cacheAge < CACHE_DURATION) {
+      console.log(`Analytics data loaded from cache (age: ${Math.floor(cacheAge / 1000)}s)`)
+      const { analyticsData, channelData } = JSON.parse(cachedData)
+      setAnalyticsData(analyticsData)
+      setChannelData(channelData)
+      setLoading(false)
+      return
+    }
+
     try {
       // 日別データの取得
       // デバイスフィルターが有効な場合はdeviceCategoryディメンションを追加
@@ -343,6 +362,15 @@ export default function Dashboard() {
           .slice(0, 10) // デバイスフィルター後にTOP10を確保
         setTopProducts(sortedProducts)
       }
+
+      // 取得したデータをキャッシュに保存
+      const cacheData = {
+        analyticsData: sortedData,
+        channelData: channelGroupData
+      }
+      localStorage.setItem(cacheKey, JSON.stringify(cacheData))
+      localStorage.setItem(cacheTimestampKey, Date.now().toString())
+      console.log('Analytics data cached for 5 minutes')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'エラーが発生しました')
     } finally {

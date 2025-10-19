@@ -17,6 +17,7 @@ export default function ForecastTab({ propertyId }: ForecastTabProps) {
   const [monthlyActualData, setMonthlyActualData] = useState<{ [key: string]: number }>({})
   const [trainingData, setTrainingData] = useState<Array<{ date: string; totalRevenue: number }>>([])
   const [trainingPeriod, setTrainingPeriod] = useState<365 | 730>(365) // デフォルト365日
+  const [lastForecastTime, setLastForecastTime] = useState<number>(0) // 最終予測実行時刻
 
   // 期間の計算
   const calculatePeriods = () => {
@@ -132,11 +133,37 @@ export default function ForecastTab({ propertyId }: ForecastTabProps) {
       return
     }
 
+    // レート制限チェック（30秒間隔）
+    const RATE_LIMIT = 30 * 1000 // 30秒
+    const timeSinceLastForecast = Date.now() - lastForecastTime
+    if (lastForecastTime > 0 && timeSinceLastForecast < RATE_LIMIT) {
+      const remainingSeconds = Math.ceil((RATE_LIMIT - timeSinceLastForecast) / 1000)
+      setError(`予測は${remainingSeconds}秒後に実行できます。`)
+      return
+    }
+
     setLoading(true)
     setError('')
 
     try {
       const periods = calculatePeriods()
+
+      // キャッシュキーを生成（プロパティID、学習期間、予測期間を含む）
+      const cacheKey = `ga4-forecast-${propertyId}-${trainingPeriod}-${periodType}`
+      const cacheTimestampKey = `${cacheKey}-timestamp`
+      const CACHE_DURATION = 30 * 60 * 1000 // 30分間
+
+      // キャッシュをチェック
+      const cachedForecast = localStorage.getItem(cacheKey)
+      const cacheTimestamp = localStorage.getItem(cacheTimestampKey)
+      const cacheAge = cacheTimestamp ? Date.now() - parseInt(cacheTimestamp) : Infinity
+
+      if (cachedForecast && cacheAge < CACHE_DURATION) {
+        console.log(`Forecast data loaded from cache (age: ${Math.floor(cacheAge / 1000)}s)`)
+        setForecastData(JSON.parse(cachedForecast))
+        setLoading(false)
+        return
+      }
 
       // 予測用の学習データ（90日間）を使用
       const data = trainingData.map(item => ({
@@ -164,6 +191,14 @@ export default function ForecastTab({ propertyId }: ForecastTabProps) {
 
       const result = await response.json()
       setForecastData(result)
+
+      // 予測結果をキャッシュに保存
+      localStorage.setItem(cacheKey, JSON.stringify(result))
+      localStorage.setItem(cacheTimestampKey, Date.now().toString())
+      console.log('Forecast data cached for 30 minutes')
+
+      // レート制限用に最終実行時刻を更新
+      setLastForecastTime(Date.now())
     } catch (err) {
       setError(err instanceof Error ? err.message : '予測エラーが発生しました')
     } finally {
