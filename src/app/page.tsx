@@ -100,11 +100,11 @@ export default function Dashboard() {
         return
       }
 
-      // 起動中の場合は10秒後から定期チェック開始（最大30回=5分）
-      console.log('予測サーバー起動中、定期チェック開始（最大5分）...')
+      // 起動中の場合は15秒後から定期チェック開始（最大12回=3分）
+      console.log('予測サーバー起動中、定期チェック開始（最大3分）...')
       let retryCount = 0
-      const maxRetries = 30 // 5分間リトライ
-      const retryInterval = 10000 // 10秒間隔
+      const maxRetries = 12 // 3分間リトライ（各チェックは最大120秒待つ）
+      const retryInterval = 15000 // 15秒間隔
 
       const checkInterval = setInterval(async () => {
         retryCount++
@@ -122,17 +122,17 @@ export default function Dashboard() {
             clearInterval(checkInterval)
             setIsStartingServer(false)
           } else if (retryCount >= maxRetries) {
-            // 5分（10秒×30回）経過しても起動しない場合
-            console.error('予測サーバー起動タイムアウト（5分経過）')
+            // 3分（15秒×12回）経過しても起動しない場合
+            console.error('予測サーバー起動タイムアウト（3分経過）')
             setForecastServerStatus('unavailable')
-            setForecastServerError('サーバーの起動に失敗しました（5分経過）。Renderダッシュボードでサーバーの状態を確認してください。')
+            setForecastServerError('サーバーの起動に失敗しました（3分経過）。ページをリロードして再度お試しください。')
             clearInterval(checkInterval)
             setIsStartingServer(false)
           }
         } catch (error) {
           console.log(`起動チェックエラー (${retryCount}/${maxRetries}):`, error)
           if (retryCount >= maxRetries) {
-            console.error('予測サーバー起動失敗（5分経過）')
+            console.error('予測サーバー起動失敗（3分経過）')
             setForecastServerStatus('unavailable')
             setForecastServerError('サーバーの起動に失敗しました。時間をおいて再度お試しください。')
             clearInterval(checkInterval)
