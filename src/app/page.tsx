@@ -224,9 +224,9 @@ export default function Dashboard() {
 
     if (cachedData && cacheAge < CACHE_DURATION) {
       console.log(`Analytics data loaded from cache (age: ${Math.floor(cacheAge / 1000)}s)`)
-      const { analyticsData, channelData } = JSON.parse(cachedData)
+      const { analyticsData, channelGroupData } = JSON.parse(cachedData)
       setAnalyticsData(analyticsData)
-      setChannelData(channelData)
+      setChannelGroupData(channelGroupData)
       setLoading(false)
       return
     }
@@ -366,7 +366,7 @@ export default function Dashboard() {
       // 取得したデータをキャッシュに保存
       const cacheData = {
         analyticsData: sortedData,
-        channelData: channelGroupData
+        channelGroupData: channelGroupData
       }
       localStorage.setItem(cacheKey, JSON.stringify(cacheData))
       localStorage.setItem(cacheTimestampKey, Date.now().toString())
