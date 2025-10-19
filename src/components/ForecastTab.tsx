@@ -313,7 +313,7 @@ export default function ForecastTab({ propertyId }: ForecastTabProps) {
     <div className="space-y-6">
       {/* 予測設定 */}
       <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-gray-900">
           <TrendingUp className="h-5 w-5 text-blue-600" />
           売上予測
         </h2>
@@ -321,7 +321,7 @@ export default function ForecastTab({ propertyId }: ForecastTabProps) {
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row gap-4 items-end">
             <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-900 mb-2">
                 学習期間
               </label>
               <select
@@ -334,7 +334,7 @@ export default function ForecastTab({ propertyId }: ForecastTabProps) {
               </select>
             </div>
             <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-900 mb-2">
                 予測期間
               </label>
               <select
@@ -397,7 +397,7 @@ export default function ForecastTab({ propertyId }: ForecastTabProps) {
                 <span className="text-sm font-medium">予測期間の売上合計</span>
               </div>
               <div className="text-2xl font-bold text-blue-900">
-                ¥{forecastTotal.toLocaleString()}
+                ¥{Math.floor(forecastTotal).toLocaleString()}
               </div>
             </div>
 
@@ -417,7 +417,7 @@ export default function ForecastTab({ propertyId }: ForecastTabProps) {
                 <span className="text-sm font-medium">1日あたり平均</span>
               </div>
               <div className="text-2xl font-bold text-purple-900">
-                ¥{Math.round(forecastTotal / calculatePeriods()).toLocaleString()}
+                ¥{Math.floor(forecastTotal / calculatePeriods()).toLocaleString()}
               </div>
             </div>
           </div>
@@ -425,7 +425,7 @@ export default function ForecastTab({ propertyId }: ForecastTabProps) {
           {/* 月別売上予測 */}
           {monthlySales.length > 0 && (
             <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold mb-4">月別売上予測</h3>
+              <h3 className="text-lg font-semibold mb-4 text-gray-900">月別売上予測</h3>
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
@@ -451,13 +451,13 @@ export default function ForecastTab({ propertyId }: ForecastTabProps) {
                           {item.month}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                          ¥{Math.round(item.actual).toLocaleString()}
+                          ¥{Math.floor(item.actual).toLocaleString()}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 text-right font-medium">
-                          ¥{Math.round(item.forecast).toLocaleString()}
+                          ¥{Math.floor(item.forecast).toLocaleString()}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-bold">
-                          ¥{Math.round(item.total).toLocaleString()}
+                          ¥{Math.floor(item.total).toLocaleString()}
                         </td>
                       </tr>
                     ))}

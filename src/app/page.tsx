@@ -275,6 +275,7 @@ export default function Dashboard() {
       setAnalyticsData(sortedData)
 
       // チャネルグループ別データの取得
+      let sortedChannelData: ChannelGroupDataItem[] = []
       const channelDimensions = deviceFilter !== 'all' ? 'sessionDefaultChannelGrouping,deviceCategory' : 'sessionDefaultChannelGrouping'
       const channelResponse = await fetch(`/api/analytics?startDate=${startDate}&endDate=${endDate}&metrics=sessions,transactions,totalRevenue&dimensions=${channelDimensions}&propertyId=${propertyId}`)
 
@@ -329,7 +330,7 @@ export default function Dashboard() {
         })
 
         // セッション数で降順ソート
-        const sortedChannelData = Object.values(aggregated).sort((a, b) => {
+        sortedChannelData = Object.values(aggregated).sort((a, b) => {
           return b.sessions - a.sessions
         })
 
@@ -363,14 +364,18 @@ export default function Dashboard() {
         setTopProducts(sortedProducts)
       }
 
-      // 取得したデータをキャッシュに保存
-      const cacheData = {
-        analyticsData: sortedData,
-        channelGroupData: channelGroupData
-      }
-      localStorage.setItem(cacheKey, JSON.stringify(cacheData))
-      localStorage.setItem(cacheTimestampKey, Date.now().toString())
-      console.log('Analytics data cached for 5 minutes')
+      // 取得したデータをキャッシュに保存（必ずsetChannelGroupDataの後に実行）
+      // キャッシュ保存はsetStateの後に非同期で実行される可能性があるため、
+      // sortedChannelDataを直接使用
+      setTimeout(() => {
+        const cacheData = {
+          analyticsData: sortedData,
+          channelGroupData: sortedChannelData
+        }
+        localStorage.setItem(cacheKey, JSON.stringify(cacheData))
+        localStorage.setItem(cacheTimestampKey, Date.now().toString())
+        console.log('Analytics data cached for 5 minutes')
+      }, 0)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'エラーが発生しました')
     } finally {
