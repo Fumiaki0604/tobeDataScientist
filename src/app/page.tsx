@@ -351,10 +351,11 @@ export default function Dashboard() {
   }, [session, propertyId, dateRange, customStartDate, customEndDate, deviceFilter])
 
   useEffect(() => {
-    if (session && propertyId && (activeTab === 'dashboard' || activeTab === 'forecast')) {
+    // データが既に存在する場合は再取得しない（タブ切り替え時の再読み込みを防ぐ）
+    if (session && propertyId && (activeTab === 'dashboard' || activeTab === 'forecast') && analyticsData.length === 0) {
       fetchAnalyticsData()
     }
-  }, [session, propertyId, fetchAnalyticsData, activeTab])
+  }, [session, propertyId, fetchAnalyticsData, activeTab, analyticsData.length])
 
   if (status === 'loading') {
     return (
