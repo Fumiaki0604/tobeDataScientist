@@ -3,30 +3,62 @@ import { NextResponse } from 'next/server'
 const FORECAST_API_URL = process.env.FORECAST_API_URL || 'http://localhost:8000'
 
 export async function GET() {
-  try {
-    console.log(`[Health Check GET] Checking: ${FORECAST_API_URL}/health`)
-    // タイムアウトを120秒に延長（Renderの起動完了を待つため）
-    const response = await fetch(`${FORECAST_API_URL}/health`, {
-      method: 'GET',
-      signal: AbortSignal.timeout(120000), // 120秒でタイムアウト
-    })
+  const MAX_RETRIES = 3
+  const RETRY_DELAY = 2000 // 2秒
 
-    console.log(`[Health Check GET] Response: ${response.status} ${response.statusText}`)
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      console.log(`[Health Check GET] Attempt ${attempt}/${MAX_RETRIES}: Checking ${FORECAST_API_URL}/health`)
 
-    if (response.ok) {
-      const data = await response.json()
-      return NextResponse.json({ status: 'ready', ...data })
-    } else {
-      return NextResponse.json({ status: 'error' }, { status: 502 })
+      const response = await fetch(`${FORECAST_API_URL}/health`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(120000), // 120秒でタイムアウト
+        headers: {
+          'User-Agent': 'GA4-Dashboard-HealthCheck/1.0',
+        },
+      })
+
+      console.log(`[Health Check GET] Attempt ${attempt}: Response ${response.status} ${response.statusText}`)
+
+      if (response.ok) {
+        const data = await response.json()
+        return NextResponse.json({ status: 'ready', ...data })
+      } else if (response.status === 502 && attempt < MAX_RETRIES) {
+        console.log(`[Health Check GET] Got 502, retrying in ${RETRY_DELAY}ms...`)
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY))
+        continue
+      } else {
+        return NextResponse.json({
+          status: 'error',
+          message: `Server responded with ${response.status}`,
+          attempt
+        }, { status: 502 })
+      }
+    } catch (error) {
+      console.error(`[Health Check GET] Attempt ${attempt} error:`, error)
+
+      if (attempt < MAX_RETRIES) {
+        console.log(`[Health Check GET] Retrying in ${RETRY_DELAY}ms...`)
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY))
+        continue
+      }
+
+      return NextResponse.json({
+        status: 'unavailable',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        url: FORECAST_API_URL,
+        attempts: MAX_RETRIES
+      }, { status: 503 })
     }
-  } catch (error) {
-    console.error(`[Health Check GET] Error:`, error)
-    return NextResponse.json({
-      status: 'unavailable',
-      error: error instanceof Error ? error.message : 'Unknown error',
-      url: FORECAST_API_URL
-    }, { status: 503 })
   }
+
+  // すべてのリトライが失敗
+  return NextResponse.json({
+    status: 'unavailable',
+    error: 'All retry attempts failed',
+    url: FORECAST_API_URL,
+    attempts: MAX_RETRIES
+  }, { status: 503 })
 }
 
 // POSTリクエストでサーバーを起動（Render.comのウェイクアップ用）
