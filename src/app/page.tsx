@@ -30,11 +30,22 @@ interface TopProductItem {
   itemsPurchased: number
 }
 
+interface HighBouncePageItem {
+  pagePath: string
+  pageTitle: string
+  screenPageViews: number
+  sessions: number
+  entrances: number
+  bounceRate: number
+  weightedBounceRate: number
+}
+
 export default function Dashboard() {
   const { data: session, status } = useSession()
   const [analyticsData, setAnalyticsData] = useState<AnalyticsDataItem[]>([])
   const [channelGroupData, setChannelGroupData] = useState<ChannelGroupDataItem[]>([])
   const [topProducts, setTopProducts] = useState<TopProductItem[]>([])
+  const [highBouncePages, setHighBouncePages] = useState<HighBouncePageItem[]>([])
   const [loading, setLoading] = useState(false)
   const [dateRange, setDateRange] = useState('7daysAgo')
   const [customStartDate, setCustomStartDate] = useState('')
@@ -362,6 +373,49 @@ export default function Dashboard() {
           .sort((a: TopProductItem, b: TopProductItem) => b.itemRevenue - a.itemRevenue)
           .slice(0, 10) // デバイスフィルター後にTOP10を確保
         setTopProducts(sortedProducts)
+      }
+
+      // 直帰率の高いページTOP10の取得
+      const pageDimensions = deviceFilter !== 'all' ? 'pagePath,pageTitle,deviceCategory' : 'pagePath,pageTitle'
+      const bounceResponse = await fetch(`/api/analytics?startDate=${startDate}&endDate=${endDate}&metrics=screenPageViews,sessions,entrances,bounceRate&dimensions=${pageDimensions}&propertyId=${propertyId}`)
+
+      if (bounceResponse.ok) {
+        const bounceResult = await bounceResponse.json()
+
+        // デバイスフィルターを適用
+        let filteredBounceData = bounceResult.data || []
+        if (deviceFilter !== 'all') {
+          const deviceCategoryMap: Record<string, string> = {
+            'desktop': 'desktop',
+            'mobile': 'mobile'
+          }
+          filteredBounceData = filteredBounceData.filter((item: any) => {
+            return item.deviceCategory?.toLowerCase() === deviceCategoryMap[deviceFilter]
+          })
+        }
+
+        // 加重直帰率を計算（直帰率 × ランディング数）して降順ソート
+        const pagesWithWeightedBounce = filteredBounceData
+          .filter((item: any) => item.pagePath && item.entrances > 0)
+          .map((item: any) => {
+            const bounceRate = item.bounceRate || 0
+            const entrances = item.entrances || 0
+            const weightedBounceRate = bounceRate * entrances
+
+            return {
+              pagePath: item.pagePath,
+              pageTitle: item.pageTitle || '(not set)',
+              screenPageViews: item.screenPageViews || 0,
+              sessions: item.sessions || 0,
+              entrances: entrances,
+              bounceRate: bounceRate,
+              weightedBounceRate: weightedBounceRate
+            }
+          })
+          .sort((a: HighBouncePageItem, b: HighBouncePageItem) => b.weightedBounceRate - a.weightedBounceRate)
+          .slice(0, 10)
+
+        setHighBouncePages(pagesWithWeightedBounce)
       }
 
       // 取得したデータをキャッシュに保存（必ずsetChannelGroupDataの後に実行）
@@ -996,6 +1050,79 @@ export default function Dashboard() {
                             </tr>
                           )
                         })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 直帰率の高いページTOP10 */}
+            <div className="mt-8">
+              <div className="bg-white p-6 rounded-lg shadow-sm border">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">直帰率の高いページ TOP10（加重直帰率順）</h3>
+                {loading ? (
+                  <div className="h-64 flex items-center justify-center">
+                    <div className="text-gray-900">読み込み中...</div>
+                  </div>
+                ) : highBouncePages.length === 0 ? (
+                  <div className="h-32 flex items-center justify-center">
+                    <div className="text-gray-900">ページデータがありません</div>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
+                            順位
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
+                            ページパス
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
+                            ページタイトル
+                          </th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-900 uppercase tracking-wider">
+                            PV数
+                          </th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-900 uppercase tracking-wider">
+                            セッション数
+                          </th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-900 uppercase tracking-wider">
+                            ランディング数
+                          </th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-900 uppercase tracking-wider">
+                            直帰率
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {highBouncePages.map((item, index) => (
+                          <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                              {index + 1}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate" title={item.pagePath}>
+                              {item.pagePath}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate" title={item.pageTitle}>
+                              {item.pageTitle}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                              {item.screenPageViews.toLocaleString()}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                              {item.sessions.toLocaleString()}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                              {item.entrances.toLocaleString()}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                              {(item.bounceRate * 100).toFixed(2)}%
+                            </td>
+                          </tr>
+                        ))}
                       </tbody>
                     </table>
                   </div>
