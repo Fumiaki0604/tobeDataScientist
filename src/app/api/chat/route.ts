@@ -90,7 +90,13 @@ export async function POST(request: NextRequest) {
 - 「先週」「今月」など相対的な期間は、今日の日付を基準に計算してください
 - 商品の売上やランキングを聞かれた場合は、metrics=['itemRevenue'], dimensions=['itemName']を使用してください
 - デバイス別の分析にはdimensions=['deviceCategory']を使用してください
-- 日別の推移にはdimensions=['date']を使用してください`
+- 日別の推移にはdimensions=['date']を使用してください
+
+メトリクスとディメンションの互換性:
+- アイテム関連メトリクス（itemRevenue, itemsPurchased）は、アイテム関連ディメンション（itemName, itemCategory）とのみ組み合わせ可能です
+- アイテム関連メトリクスは、date, pagePath, pageTitle, sessionSource, sessionDefaultChannelGroupingなどの標準ディメンションとは組み合わせできません
+- 売上合計が必要な場合は、itemRevenueではなくtotalRevenueメトリクスを使用してください
+- セッション数やPVと一緒に売上を表示する場合は、totalRevenueを使用してください`
         }
       ]
 
@@ -136,29 +142,65 @@ export async function POST(request: NextRequest) {
             const args = JSON.parse(toolCall.function.arguments)
             console.log('📞 Function call arguments:', args)
 
-            // GA4データ取得
-            console.log('📈 Fetching GA4 data...')
-            const ga4Data = await ga4Client.fetchAnalyticsData({
-              propertyId,
-              startDate: args.startDate,
-              endDate: args.endDate,
-              metrics: args.metrics,
-              dimensions: args.dimensions || [],
-              accessToken: session.accessToken,
-            })
+            try {
+              // GA4データ取得
+              console.log('📈 Fetching GA4 data...')
+              const ga4Data = await ga4Client.fetchAnalyticsData({
+                propertyId,
+                startDate: args.startDate,
+                endDate: args.endDate,
+                metrics: args.metrics,
+                dimensions: args.dimensions || [],
+                accessToken: session.accessToken,
+              })
 
-            console.log('✅ GA4 data retrieved, rows:', ga4Data.length)
+              console.log('✅ GA4 data retrieved, rows:', ga4Data.length)
 
-            // Function callの結果を追加
-            messages.push({
-              role: 'tool',
-              tool_call_id: toolCall.id,
-              content: JSON.stringify(ga4Data)
-            })
+              // Function callの結果を追加
+              messages.push({
+                role: 'tool',
+                tool_call_id: toolCall.id,
+                content: JSON.stringify(ga4Data)
+              })
+            } catch (ga4Error: any) {
+              console.error('❌ GA4 API Error:', ga4Error)
+
+              // エラーメッセージから互換性エラーを検出
+              const errorMessage = ga4Error.message || ''
+              const isCompatibilityError = errorMessage.includes('incompatible') ||
+                                          errorMessage.includes('itemRevenue')
+
+              if (isCompatibilityError) {
+                console.log('🔄 Detected compatibility error, asking AI to retry with different metrics...')
+
+                // エラー情報をツール結果として返し、AIに修正を促す
+                messages.push({
+                  role: 'tool',
+                  tool_call_id: toolCall.id,
+                  content: JSON.stringify({
+                    error: true,
+                    message: 'メトリクスとディメンションの組み合わせに互換性がありません。itemRevenueではなくtotalRevenueを使用するか、ディメンションをitemName等のアイテム関連のものに変更してください。',
+                    originalRequest: args,
+                    suggestion: 'itemRevenueをtotalRevenueに変更することを推奨します。'
+                  })
+                })
+              } else {
+                // その他のエラーの場合
+                messages.push({
+                  role: 'tool',
+                  tool_call_id: toolCall.id,
+                  content: JSON.stringify({
+                    error: true,
+                    message: `GA4データの取得に失敗しました: ${errorMessage}`
+                  })
+                })
+              }
+            }
           }
         }
 
         // すべてのFunction Call結果をOpenAIに返して最終回答を生成
+        // エラーがあった場合、AIが自動的にリトライできるようにtoolsを含める
         const finalResponse = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
@@ -167,11 +209,81 @@ export async function POST(request: NextRequest) {
           },
           body: JSON.stringify({
             model: 'gpt-4o',
-            messages
+            messages,
+            tools,
+            tool_choice: 'auto'
           })
         })
 
         const finalResult = await finalResponse.json()
+
+        // 2回目のFunction Callがあるかチェック（リトライの場合）
+        if (finalResult.choices[0].message.tool_calls) {
+          console.log('🔄 AI is retrying with corrected parameters...')
+          const retryToolCalls = finalResult.choices[0].message.tool_calls
+          messages.push(finalResult.choices[0].message)
+
+          for (const retryToolCall of retryToolCalls) {
+            if (retryToolCall.function.name === 'fetch_ga4_data') {
+              const retryArgs = JSON.parse(retryToolCall.function.arguments)
+              console.log('📞 Retry with arguments:', retryArgs)
+
+              try {
+                const retryData = await ga4Client.fetchAnalyticsData({
+                  propertyId,
+                  startDate: retryArgs.startDate,
+                  endDate: retryArgs.endDate,
+                  metrics: retryArgs.metrics,
+                  dimensions: retryArgs.dimensions || [],
+                  accessToken: session.accessToken,
+                })
+
+                console.log('✅ Retry successful, rows:', retryData.length)
+
+                messages.push({
+                  role: 'tool',
+                  tool_call_id: retryToolCall.id,
+                  content: JSON.stringify(retryData)
+                })
+              } catch (retryError: any) {
+                console.error('❌ Retry failed:', retryError)
+                messages.push({
+                  role: 'tool',
+                  tool_call_id: retryToolCall.id,
+                  content: JSON.stringify({
+                    error: true,
+                    message: `リトライも失敗しました: ${retryError.message}`
+                  })
+                })
+              }
+            }
+          }
+
+          // リトライ後の最終回答を生成
+          const retryFinalResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o',
+              messages
+            })
+          })
+
+          const retryFinalResult = await retryFinalResponse.json()
+          const retryFinalAnswer = retryFinalResult.choices[0].message.content
+
+          return NextResponse.json({
+            success: true,
+            response: retryFinalAnswer,
+            dataUsed: true,
+            functionCalls: toolCalls.length + retryToolCalls.length,
+            retried: true
+          })
+        }
+
         const finalAnswer = finalResult.choices[0].message.content
 
         return NextResponse.json({

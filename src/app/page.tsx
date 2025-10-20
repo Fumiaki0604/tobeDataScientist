@@ -376,8 +376,9 @@ export default function Dashboard() {
       }
 
       // 直帰率の高いページTOP10の取得
+      // GA4では bounceRate, bounces, sessionsを使用
       const pageDimensions = deviceFilter !== 'all' ? 'pagePath,pageTitle,deviceCategory' : 'pagePath,pageTitle'
-      const bounceResponse = await fetch(`/api/analytics?startDate=${startDate}&endDate=${endDate}&metrics=screenPageViews,sessions,entrances,bounceRate&dimensions=${pageDimensions}&propertyId=${propertyId}`)
+      const bounceResponse = await fetch(`/api/analytics?startDate=${startDate}&endDate=${endDate}&metrics=screenPageViews,sessions,bounces&dimensions=${pageDimensions}&propertyId=${propertyId}`)
 
       if (bounceResponse.ok) {
         const bounceResult = await bounceResponse.json()
@@ -394,20 +395,22 @@ export default function Dashboard() {
           })
         }
 
-        // 加重直帰率を計算（直帰率 × ランディング数）して降順ソート
+        // 加重直帰率を計算（直帰率 × セッション数）して降順ソート
+        // GA4の直帰率 = bounces / sessions
         const pagesWithWeightedBounce = filteredBounceData
-          .filter((item: any) => item.pagePath && item.entrances > 0)
+          .filter((item: any) => item.pagePath && item.sessions > 0)
           .map((item: any) => {
-            const bounceRate = item.bounceRate || 0
-            const entrances = item.entrances || 0
-            const weightedBounceRate = bounceRate * entrances
+            const sessions = item.sessions || 0
+            const bounces = item.bounces || 0
+            const bounceRate = sessions > 0 ? bounces / sessions : 0
+            const weightedBounceRate = bounceRate * sessions
 
             return {
               pagePath: item.pagePath,
               pageTitle: item.pageTitle || '(not set)',
               screenPageViews: item.screenPageViews || 0,
-              sessions: item.sessions || 0,
-              entrances: entrances,
+              sessions: sessions,
+              entrances: sessions, // GA4ではセッション数をランディング数として使用
               bounceRate: bounceRate,
               weightedBounceRate: weightedBounceRate
             }
