@@ -408,15 +408,17 @@ export default function Dashboard() {
           })
         }
 
-        // 加重直帰率を計算（直帰率 × セッション数）して降順ソート
+        // 改善優先度スコアを計算（直帰率 × √セッション数）して降順ソート
         // GA4の直帰率 = 1 - (engagedSessions / sessions)
+        // 平方根を使うことで、セッション数の影響を緩和しつつ考慮
         const pagesWithWeightedBounce = filteredBounceData
-          .filter((item: any) => item.pagePath && item.sessions > 0)
+          .filter((item: any) => item.pagePath && item.sessions >= 10) // 最低10セッション以上
           .map((item: any) => {
             const sessions = item.sessions || 0
             const engagedSessions = item.engagedSessions || 0
             const bounceRate = sessions > 0 ? 1 - (engagedSessions / sessions) : 0
-            const weightedBounceRate = bounceRate * sessions
+            // 改善優先度 = 直帰率 × √セッション数
+            const weightedBounceRate = bounceRate * Math.sqrt(sessions)
 
             return {
               pagePath: item.pagePath,
@@ -1079,7 +1081,8 @@ export default function Dashboard() {
             {/* 直帰率の高いページTOP10 */}
             <div className="mt-8">
               <div className="bg-white p-6 rounded-lg shadow-sm border">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">直帰率の高いページ TOP10（加重直帰率順）</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">改善優先度の高いページ TOP10（直帰率改善）</h3>
+                <p className="text-sm text-gray-600 mb-4">※ 改善優先度 = 直帰率 × √セッション数（直帰率が高く、適度なトラフィックがあるページを優先表示）</p>
                 {loading ? (
                   <div className="h-64 flex items-center justify-center">
                     <div className="text-gray-900">読み込み中...</div>
