@@ -132,16 +132,27 @@ export default function Dashboard() {
             setForecastServerError('')
             clearInterval(checkInterval)
             setIsStartingServer(false)
+          } else if (checkResponse.status === 502 || checkResponse.status === 503) {
+            // 502/503エラーはサーバー起動中の可能性が高いため、継続
+            console.log(`サーバー起動中 (${checkResponse.status})、待機継続... (${retryCount}/${maxRetries})`)
+            if (retryCount >= maxRetries) {
+              console.error('予測サーバー起動タイムアウト（3分経過）')
+              setForecastServerStatus('unavailable')
+              setForecastServerError('サーバーの起動に時間がかかりすぎています。Render.comの無料プランでは起動に時間がかかる場合があります。')
+              clearInterval(checkInterval)
+              setIsStartingServer(false)
+            }
           } else if (retryCount >= maxRetries) {
-            // 3分（15秒×12回）経過しても起動しない場合
+            // その他のエラーで最大リトライ回数到達
             console.error('予測サーバー起動タイムアウト（3分経過）')
             setForecastServerStatus('unavailable')
-            setForecastServerError('サーバーの起動に失敗しました（3分経過）。ページをリロードして再度お試しください。')
+            setForecastServerError(`サーバーの起動に失敗しました（ステータス: ${checkResponse.status}）`)
             clearInterval(checkInterval)
             setIsStartingServer(false)
           }
         } catch (error) {
           console.log(`起動チェックエラー (${retryCount}/${maxRetries}):`, error)
+          // ネットワークエラーもサーバー起動中の可能性があるため、最大リトライまで継続
           if (retryCount >= maxRetries) {
             console.error('予測サーバー起動失敗（3分経過）')
             setForecastServerStatus('unavailable')
