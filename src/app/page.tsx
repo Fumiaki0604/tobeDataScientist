@@ -376,12 +376,14 @@ export default function Dashboard() {
       }
 
       // 直帰率の高いページTOP10の取得
-      // GA4では bounceRate, bounces, sessionsを使用
+      // GA4ではengagedSessionsとsessionsから直帰率を計算
+      // 直帰率 = 1 - (engagedSessions / sessions)
       const pageDimensions = deviceFilter !== 'all' ? 'pagePath,pageTitle,deviceCategory' : 'pagePath,pageTitle'
-      const bounceResponse = await fetch(`/api/analytics?startDate=${startDate}&endDate=${endDate}&metrics=screenPageViews,sessions,bounces&dimensions=${pageDimensions}&propertyId=${propertyId}`)
+      const bounceResponse = await fetch(`/api/analytics?startDate=${startDate}&endDate=${endDate}&metrics=screenPageViews,sessions,engagedSessions&dimensions=${pageDimensions}&propertyId=${propertyId}`)
 
       if (bounceResponse.ok) {
         const bounceResult = await bounceResponse.json()
+        console.log('Bounce data received:', bounceResult.data?.length || 0, 'rows')
 
         // デバイスフィルターを適用
         let filteredBounceData = bounceResult.data || []
@@ -396,13 +398,13 @@ export default function Dashboard() {
         }
 
         // 加重直帰率を計算（直帰率 × セッション数）して降順ソート
-        // GA4の直帰率 = bounces / sessions
+        // GA4の直帰率 = 1 - (engagedSessions / sessions)
         const pagesWithWeightedBounce = filteredBounceData
           .filter((item: any) => item.pagePath && item.sessions > 0)
           .map((item: any) => {
             const sessions = item.sessions || 0
-            const bounces = item.bounces || 0
-            const bounceRate = sessions > 0 ? bounces / sessions : 0
+            const engagedSessions = item.engagedSessions || 0
+            const bounceRate = sessions > 0 ? 1 - (engagedSessions / sessions) : 0
             const weightedBounceRate = bounceRate * sessions
 
             return {
@@ -418,7 +420,10 @@ export default function Dashboard() {
           .sort((a: HighBouncePageItem, b: HighBouncePageItem) => b.weightedBounceRate - a.weightedBounceRate)
           .slice(0, 10)
 
+        console.log('Processed bounce pages:', pagesWithWeightedBounce.length)
         setHighBouncePages(pagesWithWeightedBounce)
+      } else {
+        console.error('Failed to fetch bounce data:', bounceResponse.status)
       }
 
       // 取得したデータをキャッシュに保存（必ずsetChannelGroupDataの後に実行）
