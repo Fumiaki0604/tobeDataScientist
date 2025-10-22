@@ -1,5 +1,28 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+
 export default function GA4LoadingSpinner() {
   const animatedText = ['G', 'N', 'I', 'D', 'A', 'O', 'L']
+  const [logs, setLogs] = useState<string[]>([])
+
+  useEffect(() => {
+    // ローカルストレージからログを定期的に取得
+    const interval = setInterval(() => {
+      const storedLogs = localStorage.getItem('ga4-loading-logs')
+      if (storedLogs) {
+        try {
+          const parsed = JSON.parse(storedLogs)
+          // 最新3行のみ表示
+          setLogs(parsed.slice(-3))
+        } catch (e) {
+          // エラーは無視
+        }
+      }
+    }, 300) // 300msごとに更新
+
+    return () => clearInterval(interval)
+  }, [])
 
   return (
     <div className="fixed inset-0 bg-gray-50 flex flex-col items-center justify-center z-50 gap-8">
@@ -67,6 +90,19 @@ export default function GA4LoadingSpinner() {
 
       {/* 固定テキスト */}
       <p className="text-lg text-gray-900 font-medium">GA4プロパティを読み込んでいます</p>
+
+      {/* ログ表示（最新3行） */}
+      {logs.length > 0 && (
+        <div className="bg-white rounded-lg shadow-md p-4 w-full max-w-2xl">
+          <div className="space-y-1 font-mono text-sm text-gray-700">
+            {logs.map((log, index) => (
+              <div key={index} className="animate-fade-in">
+                {log}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* LOADINGアニメーション */}
       <div className="relative w-[600px] h-[36px] overflow-visible select-none">

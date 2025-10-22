@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { ChevronDown, Check, Globe } from 'lucide-react'
+import { ChevronDown, Check, Globe, LogOut } from 'lucide-react'
+import { signOut } from 'next-auth/react'
 import GA4LoadingSpinner from './GA4LoadingSpinner'
 
 interface Property {
@@ -32,6 +33,8 @@ export default function PropertySelector({ onPropertySelected, selectedPropertyI
         setIsUpdating(true)
       } else {
         setLoading(true)
+        // ログをクリア
+        localStorage.removeItem('ga4-loading-logs')
       }
 
       const response = await fetch('/api/properties')
@@ -44,6 +47,11 @@ export default function PropertySelector({ onPropertySelected, selectedPropertyI
 
       if (result.success) {
         setProperties(result.properties)
+
+        // ログをlocalStorageに保存（ローディング画面で表示するため）
+        if (result.logs && result.logs.length > 0 && !isBackgroundUpdate) {
+          localStorage.setItem('ga4-loading-logs', JSON.stringify(result.logs))
+        }
 
         // プロパティ一覧をローカルストレージにキャッシュ（タイムスタンプ付き）
         localStorage.setItem('ga4-properties-cache', JSON.stringify(result.properties))
@@ -240,7 +248,17 @@ export default function PropertySelector({ onPropertySelected, selectedPropertyI
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
         <div className="bg-white p-8 rounded-lg shadow-md max-w-2xl w-full mx-4">
-          <h1 className="text-2xl font-bold mb-4 text-center">GA4プロパティを選択</h1>
+          <div className="flex justify-between items-center mb-4">
+            <h1 className="text-2xl font-bold text-gray-900">GA4プロパティを選択</h1>
+            <button
+              onClick={() => signOut({ callbackUrl: '/' })}
+              className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+              title="ログアウト"
+            >
+              <LogOut className="h-4 w-4" />
+              ログアウト
+            </button>
+          </div>
           <p className="text-gray-900 mb-6 text-center">
             分析したいGoogle Analytics 4プロパティを選択してください。
           </p>

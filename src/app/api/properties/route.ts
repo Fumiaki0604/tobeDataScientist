@@ -49,6 +49,7 @@ export async function GET() {
 
     // 各アカウントのプロパティを取得
     const allProperties = []
+    const logs: string[] = []
     const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
     for (let i = 0; i < accounts.length; i++) {
@@ -92,7 +93,9 @@ export async function GET() {
             propertyPageToken = propertiesResponse.data.nextPageToken
           } while (propertyPageToken)
 
-          console.log(`アカウント ${account.displayName}: ${accountPropertyCount}件のプロパティ取得`)
+          const logMessage = `${account.displayName}: ${accountPropertyCount}件のプロパティ取得`
+          console.log(`アカウント ${logMessage}`)
+          logs.push(logMessage)
         } catch (error: any) {
           // レート制限エラー（429）の場合は処理を中断
           if (error?.code === 429 || error?.status === 429) {
@@ -115,6 +118,7 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       properties: ga4Properties,
+      logs, // ログを追加
     })
 
   } catch (error) {
