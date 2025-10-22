@@ -81,15 +81,16 @@ Next.jsアプリケーションには`.env.local`が必要です（`.env.example
     - `chat/route.ts`: **重要** AIチャットAPI（OpenAI Function Calling、複数Function Calls対応）
     - `analytics/route.ts`: GA4データ取得API
     - `properties/route.ts`: ユーザーのGA4プロパティ一覧取得
+    - `properties-stream/route.ts`: **SSE** プロパティ取得進捗をリアルタイム配信
     - `property/route.ts`: 特定プロパティのメタデータ取得
     - `forecast/route.ts`: 予測APIプロキシ（Python Forecast APIへのリクエスト転送）
-    - `forecast/health/route.ts`: 予測サーバー状態確認・起動エンドポイント
+    - `forecast/health/route.ts`: 予測サーバー状態確認・起動エンドポイント（120秒タイムアウト）
 
 - `components/`: React コンポーネント
   - `ChatInterface.tsx`: AIチャットUI（質問例、分析状態表示）
-  - `PropertySelector.tsx`: GA4プロパティ選択UI
-  - `ForecastTab.tsx`: 売上予測タブUI（Prophet予測の実行・表示、月別集計）
-  - `GA4LoadingSpinner.tsx`: プロパティ読み込み中のローディング画面
+  - `PropertySelector.tsx`: GA4プロパティ選択UI（ログアウトボタン付き）
+  - `ForecastTab.tsx`: 売上予測タブUI（Prophet予測の実行・表示、月別集計、当日データ除外）
+  - `GA4LoadingSpinner.tsx`: プロパティ読み込み中のローディング画面（SSEでログ表示、最新3行）
 
 - `mcp-modules/`: GA4 Data API クライアント
   - `ga4-client.ts`: GA4 Data API v1beta との通信（メトリクス・ディメンション取得、データ整形）
@@ -127,9 +128,14 @@ Next.jsアプリケーションには`.env.local`が必要です（`.env.example
 **予測APIとの連携**:
 - `/api/forecast/route.ts`: Next.js → Python Forecast APIへのプロキシ
 - `/api/forecast/health/route.ts`:
-  - GET: サーバー状態確認（`ready` / `unavailable`）
-  - POST: サーバー起動トリガー（Renderのウェイクアップ）
-- タイムアウト: GET=10秒、POST=30秒
+  - GET: サーバー状態確認（`ready` / `unavailable`、3回リトライ）
+  - POST: サーバー起動トリガー（Renderのウェイクアップ、120秒待機）
+- タイムアウト: GET=120秒、POST=120秒（フォントキャッシュ構築時間を考慮）
+
+**プロパティ選択のSSEログ表示**:
+- `/api/properties-stream/route.ts`: Server-Sent Events (SSE)でプロパティ取得進捗を配信
+- `GA4LoadingSpinner.tsx`: EventSourceでログをリアルタイム受信、最新3行のみ表示
+- ログ形式: 「アカウント名: X件のプロパティ取得」
 
 ## 重要な技術的決定
 
@@ -189,26 +195,36 @@ Next.jsアプリケーションには`.env.local`が必要です（`.env.example
 4. 指定期間（デフォルト30日）の予測を実行
 5. 予測値・信頼区間（95%）・過去データとのフィットを返却（すべて0以上にクリップ）
 
-**季節性自動調整** (`main.py:103-113`):
+**Prophet設定の改善** (`main.py`):
 ```python
 data_days = (df['ds'].max() - df['ds'].min()).days
 enable_yearly = data_days >= 180  # 半年以上で年次季節性ON
 
+# floor制約を削除（より自然な予測）
 model = Prophet(
-    daily_seasonality=True,
+    daily_seasonality=False,  # 日次季節性は無効
     weekly_seasonality=True,
-    yearly_seasonality=enable_yearly,  # 自動調整
-    changepoint_prior_scale=0.05,
+    yearly_seasonality=enable_yearly,
+    changepoint_prior_scale=0.05,  # 安定性重視
+    seasonality_prior_scale=10.0,
+    changepoint_range=0.8,
     interval_width=0.95
 )
-df['floor'] = 0  # 売上はマイナスにならない
+
+# 予測後に下限を適用（平均値の5%）
+min_prediction = max(mean_value * 0.05, 0)
 ```
+
+**重要な変更点（2025-10-22）**:
+- **当日データを学習から除外**: 昨日までのデータのみで予測（`ForecastTab.tsx`）
+- **¥0予測を防止**: floor制約を削除し、予測後に平均値の5%を下限に設定
+- **フォントカラー改善**: 学習期間・予測期間のselect要素を黒に変更
 
 **注意点**:
 - 最低7日分のデータが必要（Prophetの制限）
 - Render無料プランでは15分間アクセスがないとスリープモード
-- 初回起動に30秒〜1分かかる場合あり
-- マイナス値は自動的に0にクリップされる
+- 初回起動に30秒〜1分かかる場合あり（フォントキャッシュ構築含む）
+- 予測値は平均値の5%を下限として設定される
 
 ## タブ別機能説明
 
