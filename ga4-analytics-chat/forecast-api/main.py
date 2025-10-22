@@ -106,40 +106,46 @@ async def create_forecast(request: ForecastRequest):
 
         logger.info(f"データ期間: {data_days}日, 年次季節性: {'有効' if enable_yearly else '無効'}")
 
+        # データの統計情報を計算
+        mean_value = df['y'].mean()
+        min_value = df['y'].min()
+        max_value = df['y'].max()
+        logger.info(f"売上統計: 平均={mean_value:.0f}, 最小={min_value:.0f}, 最大={max_value:.0f}")
+
         # Prophetモデルの作成と学習
+        # floor制約を削除し、予測後に下限を適用（より自然な予測）
         model = Prophet(
             daily_seasonality=False,  # 日次季節性は無効（ECサイトには不要、ノイズになる）
             weekly_seasonality=True,  # 週次季節性（週末効果など）
             yearly_seasonality=enable_yearly,  # データ期間に応じて自動調整
-            changepoint_prior_scale=0.15,  # トレンドの柔軟性を向上（デフォルト0.05→0.15）
-            seasonality_prior_scale=10.0,  # 季節性の強度を向上（デフォルト10.0）
-            changepoint_range=0.9,  # トレンド変化点を検出する範囲（最新のトレンドも考慮）
+            changepoint_prior_scale=0.05,  # トレンドの柔軟性（デフォルト0.05、安定性重視）
+            seasonality_prior_scale=10.0,  # 季節性の強度（デフォルト10.0）
+            changepoint_range=0.8,  # トレンド変化点を検出する範囲（デフォルト0.8）
             interval_width=0.95  # 信頼区間95%
         )
 
-        # 売上は必ず0以上（マイナスにならない）
-        df['floor'] = 0
         model.fit(df)
         logger.info("モデル学習完了")
 
         # 未来の日付を生成
         future = model.make_future_dataframe(periods=request.periods)
 
-        # 予測データにもfloorを設定（売上は0以上）
-        future['floor'] = 0
-
         # 予測実行
         forecast_df = model.predict(future)
         logger.info("予測完了")
+
+        # 予測値の下限を設定（平均値の5%を最小値とする）
+        min_prediction = max(mean_value * 0.05, 0)
+        logger.info(f"予測値の下限: {min_prediction:.0f}")
 
         # 過去データの整形
         historical = [
             {
                 'date': row['ds'].strftime('%Y-%m-%d'),
                 'value': float(row['y']),
-                'predicted': max(0, float(forecast_df.loc[idx, 'yhat'])),  # マイナス値を0にクリップ
-                'lower': max(0, float(forecast_df.loc[idx, 'yhat_lower'])),
-                'upper': max(0, float(forecast_df.loc[idx, 'yhat_upper']))
+                'predicted': max(min_prediction, float(forecast_df.loc[idx, 'yhat'])),
+                'lower': max(min_prediction, float(forecast_df.loc[idx, 'yhat_lower'])),
+                'upper': max(min_prediction, float(forecast_df.loc[idx, 'yhat_upper']))
             }
             for idx, row in df.iterrows()
         ]
@@ -149,9 +155,9 @@ async def create_forecast(request: ForecastRequest):
         forecast = [
             {
                 'date': row['ds'].strftime('%Y-%m-%d'),
-                'predicted': max(0, float(row['yhat'])),  # マイナス値を0にクリップ
-                'lower': max(0, float(row['yhat_lower'])),  # 信頼区間下限も0以上
-                'upper': max(0, float(row['yhat_upper']))  # 念のため上限も
+                'predicted': max(min_prediction, float(row['yhat'])),
+                'lower': max(min_prediction, float(row['yhat_lower'])),
+                'upper': max(min_prediction, float(row['yhat_upper']))
             }
             for idx, row in forecast_df.iloc[forecast_start_idx:].iterrows()
         ]
