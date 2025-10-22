@@ -70,19 +70,21 @@ export default function ForecastTab({ propertyId }: ForecastTabProps) {
       try {
         const today = new Date()
 
+        // 昨日までのデータを取得（当日は学習データに含めない）
+        const yesterday = new Date(today)
+        yesterday.setDate(today.getDate() - 1)
+        const yesterdayStr = yesterday.toISOString().split('T')[0]
+
         // 指定された日数前
-        const startDate = new Date(today)
-        startDate.setDate(today.getDate() - trainingPeriod)
+        const startDate = new Date(yesterday)
+        startDate.setDate(yesterday.getDate() - trainingPeriod)
         const startDateStr = startDate.toISOString().split('T')[0]
 
-        // 今日
-        const todayStr = today.toISOString().split('T')[0]
+        console.log(`学習データ取得開始: ${trainingPeriod}日間 (${startDateStr} 〜 ${yesterdayStr})【当日除外】`)
 
-        console.log(`学習データ取得開始: ${trainingPeriod}日間 (${startDateStr} 〜 ${todayStr})`)
-
-        // 過去のデータを取得（予測用）
+        // 過去のデータを取得（予測用・当日は除外）
         const response = await fetch(
-          `/api/analytics?startDate=${startDateStr}&endDate=${todayStr}&metrics=totalRevenue&dimensions=date&propertyId=${propertyId}`
+          `/api/analytics?startDate=${startDateStr}&endDate=${yesterdayStr}&metrics=totalRevenue&dimensions=date&propertyId=${propertyId}`
         )
 
         if (response.ok) {
@@ -327,7 +329,7 @@ export default function ForecastTab({ propertyId }: ForecastTabProps) {
               <select
                 value={trainingPeriod}
                 onChange={(e) => setTrainingPeriod(Number(e.target.value) as 365 | 730)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
               >
                 <option value="365">過去365日間（1年、推奨）</option>
                 <option value="730">過去730日間（2年）</option>
@@ -340,7 +342,7 @@ export default function ForecastTab({ propertyId }: ForecastTabProps) {
               <select
                 value={periodType}
                 onChange={(e) => setPeriodType(e.target.value as 'current_month' | 'next_month')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
               >
                 <option value="current_month">今月末まで（{calculatePeriods()}日間）</option>
                 <option value="next_month">来月末まで（{calculatePeriods()}日間）</option>
