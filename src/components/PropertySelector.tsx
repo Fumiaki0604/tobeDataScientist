@@ -33,8 +33,9 @@ export default function PropertySelector({ onPropertySelected, selectedPropertyI
         setIsUpdating(true)
       } else {
         setLoading(true)
-        // ログをクリア
-        localStorage.removeItem('ga4-loading-logs')
+        // ログを初期化
+        localStorage.setItem('ga4-loading-logs', JSON.stringify([]))
+        localStorage.setItem('ga4-loading-started', Date.now().toString())
       }
 
       const response = await fetch('/api/properties')
@@ -52,6 +53,9 @@ export default function PropertySelector({ onPropertySelected, selectedPropertyI
         if (result.logs && result.logs.length > 0 && !isBackgroundUpdate) {
           localStorage.setItem('ga4-loading-logs', JSON.stringify(result.logs))
         }
+
+        // ローディング完了フラグ
+        localStorage.removeItem('ga4-loading-started')
 
         // プロパティ一覧をローカルストレージにキャッシュ（タイムスタンプ付き）
         localStorage.setItem('ga4-properties-cache', JSON.stringify(result.properties))

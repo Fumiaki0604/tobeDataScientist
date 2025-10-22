@@ -7,21 +7,37 @@ export default function GA4LoadingSpinner() {
   const [logs, setLogs] = useState<string[]>([])
 
   useEffect(() => {
-    // ローカルストレージからログを定期的に取得
-    const interval = setInterval(() => {
-      const storedLogs = localStorage.getItem('ga4-loading-logs')
-      if (storedLogs) {
-        try {
-          const parsed = JSON.parse(storedLogs)
-          // 最新3行のみ表示
-          setLogs(parsed.slice(-3))
-        } catch (e) {
-          // エラーは無視
-        }
-      }
-    }, 300) // 300msごとに更新
+    // Server-Sent Eventsでログをストリーミング受信
+    const eventSource = new EventSource('/api/properties-stream')
 
-    return () => clearInterval(interval)
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data)
+
+        if (data.log) {
+          // ログメッセージを追加（最新3行のみ保持）
+          setLogs((prevLogs) => {
+            const updated = [...prevLogs, data.log]
+            return updated.slice(-3)
+          })
+        }
+
+        if (data.done) {
+          // 完了したらEventSourceを閉じる
+          eventSource.close()
+        }
+      } catch (e) {
+        // JSON parseエラーは無視
+      }
+    }
+
+    eventSource.onerror = () => {
+      eventSource.close()
+    }
+
+    return () => {
+      eventSource.close()
+    }
   }, [])
 
   return (
