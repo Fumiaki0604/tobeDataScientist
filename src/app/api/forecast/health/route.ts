@@ -67,36 +67,51 @@ export async function POST() {
     console.log(`[Health Check POST] Waking up: ${FORECAST_API_URL}/health`)
     console.log(`[Health Check POST] Environment: FORECAST_API_URL=${FORECAST_API_URL}`)
 
-    // 起動トリガーリクエストを投げっぱなし（5秒でタイムアウト）
-    // Renderは最初のリクエストで起動を開始するが、応答は待たない
-    fetch(`${FORECAST_API_URL}/health`, {
+    // Renderのコールドスタートを待つ（最大120秒）
+    // 初回起動時はフォントキャッシュ構築で30秒以上かかる
+    console.log(`[Health Check POST] Sending wake-up request (max 120s timeout)...`)
+
+    const response = await fetch(`${FORECAST_API_URL}/health`, {
       method: 'GET',
-      signal: AbortSignal.timeout(5000),
-    }).catch((err) => {
-      console.log(`[Health Check POST] Wake-up trigger sent (timeout expected):`, err.message)
+      signal: AbortSignal.timeout(120000), // 120秒待つ
+      headers: {
+        'User-Agent': 'GA4-Dashboard-WakeUp/1.0',
+      },
     })
 
-    // 即座に「起動中」ステータスを返す
-    // クライアント側で定期的にGETでポーリングする
-    console.log(`[Health Check POST] Wake-up signal sent. Client will poll for readiness.`)
-    return NextResponse.json({
-      status: 'starting',
-      message: 'サーバー起動リクエストを送信しました。起動完了まで1-2分お待ちください。',
-      debugInfo: {
-        apiUrl: FORECAST_API_URL,
-        timestamp: new Date().toISOString()
-      }
-    }, { status: 200 })
+    if (response.ok) {
+      const data = await response.json()
+      console.log(`[Health Check POST] Server woke up successfully!`, data)
+      return NextResponse.json({
+        status: 'ready',
+        message: 'サーバーが起動しました',
+        data
+      }, { status: 200 })
+    } else {
+      console.log(`[Health Check POST] Server responded with ${response.status}, needs more time`)
+      return NextResponse.json({
+        status: 'starting',
+        message: 'サーバー起動中です。もう少しお待ちください。',
+        httpStatus: response.status
+      }, { status: 200 })
+    }
   } catch (error) {
-    console.error(`[Health Check POST] Unexpected error:`, error)
+    // タイムアウトまたはネットワークエラー
+    console.error(`[Health Check POST] Wake-up error:`, error)
+
+    // タイムアウトの場合は起動中として扱う
+    if (error instanceof Error && error.name === 'TimeoutError') {
+      return NextResponse.json({
+        status: 'starting',
+        message: 'サーバー起動に時間がかかっています。引き続きお待ちください。',
+        error: 'タイムアウト（120秒経過）'
+      }, { status: 200 })
+    }
+
     return NextResponse.json({
-      status: 'starting',
-      message: 'サーバー起動リクエストを送信しました。起動完了まで1-2分お待ちください。',
-      error: error instanceof Error ? error.message : 'Unknown error',
-      debugInfo: {
-        apiUrl: FORECAST_API_URL,
-        timestamp: new Date().toISOString()
-      }
-    }, { status: 200 })
+      status: 'error',
+      message: 'サーバー起動リクエストに失敗しました',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 503 })
   }
 }

@@ -104,17 +104,30 @@ export default function Dashboard() {
       const response = await fetch('/api/forecast/health', { method: 'POST' })
       const data = await response.json()
 
-      if (data.status === 'started') {
-        console.log('予測サーバーが即座に起動しました')
+      console.log('予測サーバー起動レスポンス:', data)
+
+      // POSTリクエストで即座に起動完了した場合
+      if (data.status === 'ready') {
+        console.log('予測サーバーが起動しました（既に起動済み、または即座に起動完了）')
         setForecastServerStatus('ready')
+        setForecastServerError('')
         setIsStartingServer(false)
         return
       }
 
-      // 起動中の場合は15秒後から定期チェック開始（最大12回=3分）
+      // エラーの場合
+      if (data.status === 'error') {
+        console.error('予測サーバー起動エラー:', data.message)
+        setForecastServerStatus('unavailable')
+        setForecastServerError(data.message || '起動に失敗しました')
+        setIsStartingServer(false)
+        return
+      }
+
+      // 起動中（startingまたはタイムアウト）の場合は定期チェック開始
       console.log('予測サーバー起動中、定期チェック開始（最大3分）...')
       let retryCount = 0
-      const maxRetries = 12 // 3分間リトライ（各チェックは最大120秒待つ）
+      const maxRetries = 12 // 3分間リトライ
       const retryInterval = 15000 // 15秒間隔
 
       const checkInterval = setInterval(async () => {
@@ -138,7 +151,7 @@ export default function Dashboard() {
             if (retryCount >= maxRetries) {
               console.error('予測サーバー起動タイムアウト（3分経過）')
               setForecastServerStatus('unavailable')
-              setForecastServerError('サーバーの起動に時間がかかりすぎています。Render.comの無料プランでは起動に時間がかかる場合があります。')
+              setForecastServerError('サーバーの起動に時間がかかりすぎています。しばらく待ってから再度お試しください。')
               clearInterval(checkInterval)
               setIsStartingServer(false)
             }
