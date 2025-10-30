@@ -9,6 +9,14 @@ export const GA4FetchParamsSchema = z.object({
   dimensions: z.array(z.string()).optional(),
   accessToken: z.string(),
   limit: z.number().optional(),
+  dimensionFilter: z.object({
+    fieldName: z.string(),
+    stringFilter: z.object({
+      matchType: z.enum(['EXACT', 'BEGINS_WITH', 'ENDS_WITH', 'CONTAINS', 'FULL_REGEXP', 'PARTIAL_REGEXP']),
+      value: z.string(),
+      caseSensitive: z.boolean().optional(),
+    }),
+  }).optional(),
 });
 
 export type GA4FetchParams = z.infer<typeof GA4FetchParamsSchema>;
@@ -41,6 +49,16 @@ export class GA4Client {
     // limitが指定されている場合は追加
     if (params.limit) {
       requestBody.limit = params.limit;
+    }
+
+    // dimensionFilterが指定されている場合は追加
+    if (params.dimensionFilter) {
+      requestBody.dimensionFilter = {
+        filter: {
+          fieldName: params.dimensionFilter.fieldName,
+          stringFilter: params.dimensionFilter.stringFilter,
+        },
+      };
     }
 
     console.log(`[GA4Client] Request body:`, JSON.stringify(requestBody, null, 2));

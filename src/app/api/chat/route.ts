@@ -66,6 +66,32 @@ export async function POST(request: NextRequest) {
                 type: 'array',
                 items: { type: 'string' },
                 description: '取得するディメンション。利用可能: date(日付), itemName(商品名), deviceCategory(デバイス), pagePath(ページパス), pageTitle(ページタイトル), sessionSource(ソース), sessionDefaultChannelGrouping(チャネル), itemCategory(商品カテゴリ)'
+              },
+              dimensionFilter: {
+                type: 'object',
+                description: 'ディメンションのフィルター条件（特定のページや商品のみを取得する場合に使用）',
+                properties: {
+                  fieldName: {
+                    type: 'string',
+                    description: 'フィルター対象のディメンション名（例: pagePath, itemName）'
+                  },
+                  stringFilter: {
+                    type: 'object',
+                    properties: {
+                      matchType: {
+                        type: 'string',
+                        enum: ['EXACT', 'BEGINS_WITH', 'ENDS_WITH', 'CONTAINS', 'FULL_REGEXP', 'PARTIAL_REGEXP'],
+                        description: 'マッチタイプ。EXACT=完全一致, CONTAINS=部分一致, BEGINS_WITH=前方一致'
+                      },
+                      value: {
+                        type: 'string',
+                        description: 'フィルター値（例: /shop/goods/search.aspx）'
+                      }
+                    },
+                    required: ['matchType', 'value']
+                  }
+                },
+                required: ['fieldName', 'stringFilter']
               }
             },
             required: ['startDate', 'endDate', 'metrics']
@@ -91,6 +117,22 @@ export async function POST(request: NextRequest) {
 - 商品の売上やランキングを聞かれた場合は、metrics=['itemRevenue'], dimensions=['itemName']を使用してください
 - デバイス別の分析にはdimensions=['deviceCategory']を使用してください
 - 日別の推移にはdimensions=['date']を使用してください
+- **重要**: 特定のURL・ページ・商品が指定された場合は、必ずdimensionFilterを使用してください
+
+  フィルター使用例:
+  1. 「/shop/goods/search.aspx を含むページ」
+     → dimensionFilter={ fieldName: 'pagePath', stringFilter: { matchType: 'CONTAINS', value: '/shop/goods/search.aspx' } }
+
+  2. 「商品名にナイキを含む売上」
+     → dimensionFilter={ fieldName: 'itemName', stringFilter: { matchType: 'CONTAINS', value: 'ナイキ' } }
+
+  3. 「/shop/g/で始まるページ」
+     → dimensionFilter={ fieldName: 'pagePath', stringFilter: { matchType: 'BEGINS_WITH', value: '/shop/g/' } }
+
+  4. 「特定の商品『ナイキ エアマックス 90』」
+     → dimensionFilter={ fieldName: 'itemName', stringFilter: { matchType: 'EXACT', value: 'ナイキ エアマックス 90' } }
+
+- フィルターを使わないと全データが返され、データサイズが大きくなりすぎてエラーになるため、必ずフィルターを使用してください
 
 メトリクスとディメンションの互換性:
 - アイテム関連メトリクス（itemRevenue, itemsPurchased）は、アイテム関連ディメンション（itemName, itemCategory）とのみ組み合わせ可能です
@@ -125,8 +167,30 @@ export async function POST(request: NextRequest) {
         })
       })
 
+      console.log('🌐 OpenAI API Response Status:', response.status, response.statusText)
+
       const result = await response.json()
       console.log('📩 OpenAI response:', JSON.stringify(result, null, 2))
+
+      // HTTPステータスコードのチェック
+      if (!response.ok) {
+        console.error('❌ OpenAI API HTTP Error:', response.status, result)
+        return NextResponse.json({
+          success: false,
+          response: `OpenAI APIエラー: ${result.error?.message || 'Unknown error'}`,
+          error: result.error?.message || `HTTP ${response.status}`,
+        })
+      }
+
+      // レスポンスの検証
+      if (!result.choices || result.choices.length === 0) {
+        console.error('❌ Invalid OpenAI response:', result)
+        return NextResponse.json({
+          success: false,
+          response: 'AIからの応答が無効です。OpenAI APIの状態を確認してください。',
+          error: result.error?.message || 'Invalid response format',
+        })
+      }
 
       // Function callがあるかチェック
       if (result.choices[0].message.tool_calls) {
@@ -145,23 +209,35 @@ export async function POST(request: NextRequest) {
             try {
               // GA4データ取得
               console.log('📈 Fetching GA4 data...')
-              const ga4Data = await ga4Client.fetchAnalyticsData({
+              const fetchParams: any = {
                 propertyId,
                 startDate: args.startDate,
                 endDate: args.endDate,
                 metrics: args.metrics,
                 dimensions: args.dimensions || [],
                 accessToken: session.accessToken,
-              })
+              };
+
+              // dimensionFilterが指定されている場合は追加
+              if (args.dimensionFilter) {
+                fetchParams.dimensionFilter = args.dimensionFilter;
+                console.log('🔍 Using dimension filter:', JSON.stringify(args.dimensionFilter));
+              }
+
+              const ga4Data = await ga4Client.fetchAnalyticsData(fetchParams)
 
               console.log('✅ GA4 data retrieved, rows:', ga4Data.length)
 
               // Function callの結果を追加
+              const toolResultContent = JSON.stringify(ga4Data)
+              console.log('📦 Tool result size:', toolResultContent.length, 'characters')
+
               messages.push({
                 role: 'tool',
                 tool_call_id: toolCall.id,
-                content: JSON.stringify(ga4Data)
+                content: toolResultContent
               })
+              console.log('✅ Tool result added to messages array')
             } catch (ga4Error: any) {
               console.error('❌ GA4 API Error:', ga4Error)
 
@@ -199,8 +275,12 @@ export async function POST(request: NextRequest) {
           }
         }
 
+        console.log('✅ All function calls processed. Total messages:', messages.length)
+
         // すべてのFunction Call結果をOpenAIに返して最終回答を生成
         // エラーがあった場合、AIが自動的にリトライできるようにtoolsを含める
+        console.log('🤖 Sending final response to OpenAI...')
+        console.log('📨 Messages array size:', JSON.stringify(messages).length, 'characters')
         const finalResponse = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
@@ -215,7 +295,30 @@ export async function POST(request: NextRequest) {
           })
         })
 
+        console.log('🌐 OpenAI Final API Response Status:', finalResponse.status, finalResponse.statusText)
+
         const finalResult = await finalResponse.json()
+        console.log('📩 OpenAI final response:', JSON.stringify(finalResult, null, 2))
+
+        // HTTPステータスコードのチェック
+        if (!finalResponse.ok) {
+          console.error('❌ OpenAI Final API HTTP Error:', finalResponse.status, finalResult)
+          return NextResponse.json({
+            success: false,
+            response: `OpenAI APIエラー（最終回答）: ${finalResult.error?.message || 'Unknown error'}`,
+            error: finalResult.error?.message || `HTTP ${finalResponse.status}`,
+          })
+        }
+
+        // レスポンスの検証
+        if (!finalResult.choices || finalResult.choices.length === 0) {
+          console.error('❌ Invalid OpenAI final response:', finalResult)
+          return NextResponse.json({
+            success: false,
+            response: 'AIからの最終応答が無効です。',
+            error: finalResult.error?.message || 'Invalid response format',
+          })
+        }
 
         // 2回目のFunction Callがあるかチェック（リトライの場合）
         if (finalResult.choices[0].message.tool_calls) {
@@ -229,14 +332,22 @@ export async function POST(request: NextRequest) {
               console.log('📞 Retry with arguments:', retryArgs)
 
               try {
-                const retryData = await ga4Client.fetchAnalyticsData({
+                const retryFetchParams: any = {
                   propertyId,
                   startDate: retryArgs.startDate,
                   endDate: retryArgs.endDate,
                   metrics: retryArgs.metrics,
                   dimensions: retryArgs.dimensions || [],
                   accessToken: session.accessToken,
-                })
+                };
+
+                // dimensionFilterが指定されている場合は追加
+                if (retryArgs.dimensionFilter) {
+                  retryFetchParams.dimensionFilter = retryArgs.dimensionFilter;
+                  console.log('🔍 Retry using dimension filter:', JSON.stringify(retryArgs.dimensionFilter));
+                }
+
+                const retryData = await ga4Client.fetchAnalyticsData(retryFetchParams)
 
                 console.log('✅ Retry successful, rows:', retryData.length)
 
@@ -260,6 +371,7 @@ export async function POST(request: NextRequest) {
           }
 
           // リトライ後の最終回答を生成
+          console.log('🔄 Sending retry final response to OpenAI...')
           const retryFinalResponse = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: {
@@ -272,7 +384,31 @@ export async function POST(request: NextRequest) {
             })
           })
 
+          console.log('🌐 OpenAI Retry Final API Response Status:', retryFinalResponse.status, retryFinalResponse.statusText)
+
           const retryFinalResult = await retryFinalResponse.json()
+          console.log('📩 OpenAI retry final response:', JSON.stringify(retryFinalResult, null, 2))
+
+          // HTTPステータスコードのチェック
+          if (!retryFinalResponse.ok) {
+            console.error('❌ OpenAI Retry Final API HTTP Error:', retryFinalResponse.status, retryFinalResult)
+            return NextResponse.json({
+              success: false,
+              response: `OpenAI APIエラー（リトライ後）: ${retryFinalResult.error?.message || 'Unknown error'}`,
+              error: retryFinalResult.error?.message || `HTTP ${retryFinalResponse.status}`,
+            })
+          }
+
+          // レスポンスの検証
+          if (!retryFinalResult.choices || retryFinalResult.choices.length === 0) {
+            console.error('❌ Invalid OpenAI retry final response:', retryFinalResult)
+            return NextResponse.json({
+              success: false,
+              response: 'AIからのリトライ後の応答が無効です。',
+              error: retryFinalResult.error?.message || 'Invalid response format',
+            })
+          }
+
           const retryFinalAnswer = retryFinalResult.choices[0].message.content
 
           return NextResponse.json({
