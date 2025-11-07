@@ -22,7 +22,12 @@ export interface Anomaly {
   changePercent: number;
   currentValue: number;
   previousValue: number;
-  dimensions?: DimensionData[];
+  dimensions?: {
+    channels?: DimensionData[];
+    anomalousChannels?: DimensionData[];
+    devices?: DimensionData[];
+    anomalousDevices?: DimensionData[];
+  };
   detectedAt: string;
 }
 
