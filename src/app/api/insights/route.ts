@@ -1,13 +1,15 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../auth/[...nextauth]/route';
-import { runReport } from '@/mcp-modules/ga4-client';
+import { GA4Client } from '@/mcp-modules/ga4-client';
 import { detectAnomaly, findAnomalousDimensions, rankAnomalies, type Anomaly, type DimensionData } from '@/utils/anomaly-detector';
 import OpenAI from 'openai';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!
 });
+
+const ga4Client = new GA4Client();
 
 interface InsightRequest {
   propertyId: string;
@@ -35,30 +37,22 @@ export async function POST(request: Request) {
 
     // 1. 基本メトリクスの取得（現在期間 vs 前期間）
     const [currentMetrics, previousMetrics] = await Promise.all([
-      runReport({
-        property: `properties/${propertyId}`,
-        dateRanges: [{ startDate: currentStartDate, endDate: currentEndDate }],
+      ga4Client.fetchAnalyticsData({
+        propertyId,
+        startDate: currentStartDate,
+        endDate: currentEndDate,
         dimensions: [],
-        metrics: [
-          { name: 'sessions' },
-          { name: 'screenPageViews' },
-          { name: 'transactions' },
-          { name: 'totalRevenue' },
-          { name: 'activeUsers' }
-        ]
-      }, session.accessToken),
-      runReport({
-        property: `properties/${propertyId}`,
-        dateRanges: [{ startDate: previousStartDate, endDate: previousEndDate }],
+        metrics: ['sessions', 'screenPageViews', 'transactions', 'totalRevenue', 'activeUsers'],
+        accessToken: session.accessToken
+      }),
+      ga4Client.fetchAnalyticsData({
+        propertyId,
+        startDate: previousStartDate,
+        endDate: previousEndDate,
         dimensions: [],
-        metrics: [
-          { name: 'sessions' },
-          { name: 'screenPageViews' },
-          { name: 'transactions' },
-          { name: 'totalRevenue' },
-          { name: 'activeUsers' }
-        ]
-      }, session.accessToken)
+        metrics: ['sessions', 'screenPageViews', 'transactions', 'totalRevenue', 'activeUsers'],
+        accessToken: session.accessToken
+      })
     ]);
 
     // メトリクス異常検知
@@ -106,18 +100,22 @@ export async function POST(request: Request) {
       anomalies.slice(0, 3).map(async (anomaly) => {
         // チャネル別分析
         const [currentChannel, previousChannel] = await Promise.all([
-          runReport({
-            property: `properties/${propertyId}`,
-            dateRanges: [{ startDate: currentStartDate, endDate: currentEndDate }],
-            dimensions: [{ name: 'sessionDefaultChannelGrouping' }],
-            metrics: [{ name: 'sessions' }, { name: 'totalRevenue' }]
-          }, session.accessToken),
-          runReport({
-            property: `properties/${propertyId}`,
-            dateRanges: [{ startDate: previousStartDate, endDate: previousEndDate }],
-            dimensions: [{ name: 'sessionDefaultChannelGrouping' }],
-            metrics: [{ name: 'sessions' }, { name: 'totalRevenue' }]
-          }, session.accessToken)
+          ga4Client.fetchAnalyticsData({
+            propertyId,
+            startDate: currentStartDate,
+            endDate: currentEndDate,
+            dimensions: ['sessionDefaultChannelGrouping'],
+            metrics: ['sessions', 'totalRevenue'],
+            accessToken: session.accessToken
+          }),
+          ga4Client.fetchAnalyticsData({
+            propertyId,
+            startDate: previousStartDate,
+            endDate: previousEndDate,
+            dimensions: ['sessionDefaultChannelGrouping'],
+            metrics: ['sessions', 'totalRevenue'],
+            accessToken: session.accessToken
+          })
         ]);
 
         // チャネル別データ整形
@@ -143,18 +141,22 @@ export async function POST(request: Request) {
 
         // デバイス別分析
         const [currentDevice, previousDevice] = await Promise.all([
-          runReport({
-            property: `properties/${propertyId}`,
-            dateRanges: [{ startDate: currentStartDate, endDate: currentEndDate }],
-            dimensions: [{ name: 'deviceCategory' }],
-            metrics: [{ name: 'sessions' }, { name: 'totalRevenue' }]
-          }, session.accessToken),
-          runReport({
-            property: `properties/${propertyId}`,
-            dateRanges: [{ startDate: previousStartDate, endDate: previousEndDate }],
-            dimensions: [{ name: 'deviceCategory' }],
-            metrics: [{ name: 'sessions' }, { name: 'totalRevenue' }]
-          }, session.accessToken)
+          ga4Client.fetchAnalyticsData({
+            propertyId,
+            startDate: currentStartDate,
+            endDate: currentEndDate,
+            dimensions: ['deviceCategory'],
+            metrics: ['sessions', 'totalRevenue'],
+            accessToken: session.accessToken
+          }),
+          ga4Client.fetchAnalyticsData({
+            propertyId,
+            startDate: previousStartDate,
+            endDate: previousEndDate,
+            dimensions: ['deviceCategory'],
+            metrics: ['sessions', 'totalRevenue'],
+            accessToken: session.accessToken
+          })
         ]);
 
         // デバイス別データ整形
