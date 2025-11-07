@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
+import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]/route';
 import { GA4Client } from '@/mcp-modules/ga4-client';
 import { detectAnomaly, findAnomalousDimensions, rankAnomalies, type Anomaly, type DimensionData } from '@/utils/anomaly-detector';
