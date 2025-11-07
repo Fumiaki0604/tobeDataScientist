@@ -114,15 +114,24 @@ async def create_forecast(request: ForecastRequest):
 
         # Prophetモデルの作成と学習
         # floor制約を削除し、予測後に下限を適用（より自然な予測）
-        model = Prophet(
-            daily_seasonality=False,  # 日次季節性は無効（ECサイトには不要、ノイズになる）
-            weekly_seasonality=True,  # 週次季節性（週末効果など）
-            yearly_seasonality=enable_yearly,  # データ期間に応じて自動調整
-            changepoint_prior_scale=0.05,  # トレンドの柔軟性（デフォルト0.05、安定性重視）
-            seasonality_prior_scale=10.0,  # 季節性の強度（デフォルト10.0）
-            changepoint_range=0.8,  # トレンド変化点を検出する範囲（デフォルト0.8）
-            interval_width=0.95  # 信頼区間95%
-        )
+        try:
+            model = Prophet(
+                daily_seasonality=False,  # 日次季節性は無効（ECサイトには不要、ノイズになる）
+                weekly_seasonality=True,  # 週次季節性（週末効果など）
+                yearly_seasonality=enable_yearly,  # データ期間に応じて自動調整
+                changepoint_prior_scale=0.05,  # トレンドの柔軟性（デフォルト0.05、安定性重視）
+                seasonality_prior_scale=10.0,  # 季節性の強度（デフォルト10.0）
+                changepoint_range=0.8,  # トレンド変化点を検出する範囲（デフォルト0.8）
+                interval_width=0.95  # 信頼区間95%
+            )
+            logger.info("Prophetモデル作成完了")
+        except Exception as e:
+            logger.error(f"Prophetモデル作成エラー: {e}")
+            # cmdstanpyバックエンドが正しくインストールされていない可能性
+            raise HTTPException(
+                status_code=500,
+                detail=f"予測モデルの初期化に失敗しました。サーバー設定を確認してください: {str(e)}"
+            )
 
         model.fit(df)
         logger.info("モデル学習完了")
