@@ -119,9 +119,9 @@ export async function POST(request: Request) {
         ]);
 
         // チャネル別データ整形
-        const channelData: DimensionData[] = currentChannel.map(curr => {
+        const channelData: DimensionData[] = currentChannel.map((curr: any) => {
           const channel = curr.sessionDefaultChannelGrouping;
-          const prev = previousChannel.find(p => p.sessionDefaultChannelGrouping === channel);
+          const prev = previousChannel.find((p: any) => p.sessionDefaultChannelGrouping === channel);
           const currentValue = parseFloat(curr.sessions || '0');
           const previousValue = parseFloat(prev?.sessions || '0');
           const change = currentValue - previousValue;
@@ -160,9 +160,9 @@ export async function POST(request: Request) {
         ]);
 
         // デバイス別データ整形
-        const deviceData: DimensionData[] = currentDevice.map(curr => {
+        const deviceData: DimensionData[] = currentDevice.map((curr: any) => {
           const device = curr.deviceCategory;
-          const prev = previousDevice.find(p => p.deviceCategory === device);
+          const prev = previousDevice.find((p: any) => p.deviceCategory === device);
           const currentValue = parseFloat(curr.sessions || '0');
           const previousValue = parseFloat(prev?.sessions || '0');
           const change = currentValue - previousValue;
