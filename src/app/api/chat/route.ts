@@ -160,7 +160,7 @@ export async function POST(request: NextRequest) {
           'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-          model: 'gpt-4o',
+          model: 'gpt-5-mini-2025-08-07',
           messages,
           tools,
           tool_choice: 'auto'
@@ -379,7 +379,7 @@ export async function POST(request: NextRequest) {
               'Authorization': `Bearer ${apiKey}`
             },
             body: JSON.stringify({
-              model: 'gpt-4o',
+              model: 'gpt-5-mini-2025-08-07',
               messages
             })
           })
