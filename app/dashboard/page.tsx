@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -111,12 +112,18 @@ export default async function DashboardPage() {
                     管理者メニュー
                   </h3>
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <button className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700">
+                    <Link
+                      href="/admin/questions"
+                      className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 text-center"
+                    >
                       問題管理
-                    </button>
-                    <button className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700">
-                      ユーザー管理
-                    </button>
+                    </Link>
+                    <Link
+                      href="/admin"
+                      className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 text-center"
+                    >
+                      管理画面
+                    </Link>
                   </div>
                 </div>
               )}
