@@ -149,7 +149,7 @@ ${categoryList}
       explanation: q.explanation,
       difficulty: q.difficulty,
       source: 'ai_generated',
-      is_approved: false, // 最初は未承認
+      is_approved: true, // 自動承認
       created_by: user.id,
     }))
 

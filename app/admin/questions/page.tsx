@@ -117,17 +117,11 @@ export default async function QuestionsPage() {
                                 {question.categories.name}
                               </span>
                             )}
-                            <span
-                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                question.is_approved
-                                  ? 'bg-green-100 text-green-800'
-                                  : 'bg-yellow-100 text-yellow-800'
-                              }`}
-                            >
-                              {question.is_approved ? '承認済み' : '未承認'}
-                            </span>
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                               難易度: {question.difficulty}
+                            </span>
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                              {question.source === 'ai_generated' ? 'AI生成' : '手動作成'}
                             </span>
                           </div>
                           <p className="mt-2 text-sm text-gray-900">
