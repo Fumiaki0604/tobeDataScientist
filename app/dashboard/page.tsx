@@ -76,9 +76,12 @@ export default async function DashboardPage() {
                   <p className="text-blue-700 text-sm mb-4">
                     問題を解いて実力を試しましょう
                   </p>
-                  <button className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                  <Link
+                    href="/exam/start"
+                    className="block w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-center"
+                  >
                     開始する
-                  </button>
+                  </Link>
                 </div>
 
                 <div className="bg-green-50 p-6 rounded-lg">
