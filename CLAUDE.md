@@ -14,7 +14,10 @@ AIが問題を生成し、ユーザーが回答、正答率と合格可能性を
 ## 開発コマンド
 
 ```bash
-# 開発サーバー起動
+# 依存関係のインストール
+npm install
+
+# 開発サーバー起動 (http://localhost:3000)
 npm run dev
 
 # プロダクションビルド
@@ -33,6 +36,9 @@ npm run lint
 - **Supabase** - PostgreSQL + 認証 + ストレージ
 - **TypeScript** - 型定義は `types/database.ts` を参照
 - **Tailwind CSS** - スタイリング
+- **OpenAI API** - AI問題生成 (gpt-4など)
+- **pdf-parse** - PDFファイルからのテキスト抽出
+- **Recharts** - データ可視化・グラフ表示
 
 ## アーキテクチャ
 
@@ -97,38 +103,104 @@ RLSポリシーの詳細は `supabase/rls-policies.sql` を参照。
 ### Server Actions
 
 Server Actionsを使用する場合は `'use server'` ディレクティブが必要。
-例: ログアウト処理は `app/dashboard/page.tsx` 参照。
+例: ログアウト処理は [app/dashboard/page.tsx:23-28](tobeDataScientist/app/dashboard/page.tsx#L23-L28) を参照。
+
+### ディレクトリ構造
+
+```
+app/
+├── api/                      # API Routes
+│   └── generate-questions/   # AI問題生成エンドポイント
+├── auth/                     # 認証関連
+│   ├── login/               # ログイン
+│   ├── signup/              # 新規登録
+│   └── callback/            # OAuth コールバック
+├── dashboard/               # ダッシュボード
+├── exam/                    # 試験機能
+│   ├── start/              # 試験設定・開始
+│   └── [sessionId]/        # 試験実施・結果
+└── admin/                   # 管理者機能
+    ├── questions/          # 問題管理
+    └── pdfs/               # PDF管理
+
+lib/
+└── supabase/               # Supabaseクライアント設定
+
+types/
+└── database.ts             # データベース型定義
+
+supabase/
+├── schema.sql              # テーブル定義
+├── rls-policies.sql        # RLSポリシー
+└── seed-data.sql           # 初期データ
+```
 
 ### 型安全性
 
-- データベースの型定義: `types/database.ts`
+- データベースの型定義: [types/database.ts](tobeDataScientist/types/database.ts)
 - Supabaseクエリの戻り値は適切に型付けする
 - `AnswerOption` 型は `'a' | 'b' | 'c' | 'd'` のみ
+- 主要な型:
+  - `UserProfile` - ユーザープロファイル（role管理）
+  - `Question` - 問題データ（4択 + 正解 + 解説）
+  - `ExamSession` - 試験セッション
+  - `ExamAnswer` - 個別回答記録
+  - `Category` - カテゴリ（階層構造対応）
 
 ## 開発フェーズと実装状況
 
 ### Phase 1: 基盤構築 ✅ 完了
 - 認証機能（ログイン、新規登録、ログアウト）
 - ダッシュボード
+- ミドルウェアによる認証保護
 
-### Phase 2-7: 未実装
-- 試験機能（問題表示、回答、採点）
-- 問題管理（CRUD）
-- AI問題生成
-- 学習履歴・分析
-- PDF管理
+### Phase 2: 試験機能 🚧 部分的に実装
+- 試験開始画面 ([app/exam/start/page.tsx](tobeDataScientist/app/exam/start/page.tsx))
+- 試験実施画面 ([app/exam/[sessionId]/page.tsx](tobeDataScientist/app/exam/[sessionId]/page.tsx))
+- 試験結果画面 ([app/exam/[sessionId]/result/page.tsx](tobeDataScientist/app/exam/[sessionId]/result/page.tsx))
+
+### Phase 3: 管理者機能 🚧 部分的に実装
+- 問題管理画面 ([app/admin/questions/page.tsx](tobeDataScientist/app/admin/questions/page.tsx))
+- 問題作成・編集 ([app/admin/questions/new/page.tsx](tobeDataScientist/app/admin/questions/new/page.tsx))
+- PDF管理 ([app/admin/pdfs/page.tsx](tobeDataScientist/app/admin/pdfs/page.tsx))
+
+### Phase 4-7: 未実装
+- AI問題生成の完全統合
+- 学習履歴・詳細分析
+- カテゴリ管理UI
+- データエクスポート機能
 
 ## Supabaseデータベースの初期セットアップ
 
 新しい環境でセットアップする場合:
 
 1. Supabaseプロジェクト作成 (`SUPABASE_SETUP.md` 参照)
-2. SQL Editorで `supabase/schema.sql` 実行
-3. SQL Editorで `supabase/rls-policies.sql` 実行
-4. Storage バケット `exam-pdfs` を作成
+2. `.env.local` ファイルを作成し、環境変数を設定
+3. SQL Editorで [supabase/schema.sql](tobeDataScientist/supabase/schema.sql) を実行
+4. SQL Editorで [supabase/rls-policies.sql](tobeDataScientist/supabase/rls-policies.sql) を実行
+5. (オプション) 初期データ投入: [supabase/seed-data.sql](tobeDataScientist/supabase/seed-data.sql) を実行
+6. Storage バケット `exam-pdfs` を作成（プライベート設定）
+
+## よくある開発タスク
+
+### 新しい問題を手動で追加する
+1. 管理者としてログイン
+2. `/admin/questions/new` にアクセス
+3. カテゴリ、問題文、選択肢、正解、解説を入力
+4. `is_approved` を `true` にして保存
+
+### 試験を実施する
+1. `/exam/start` で出題数とカテゴリを選択
+2. 試験セッションが作成され、`/exam/[sessionId]` にリダイレクト
+3. 問題に回答後、`/exam/[sessionId]/result` で結果表示
+
+### RLSポリシーをデバッグする
+- Supabase Studio の「SQL Editor」で直接クエリを実行
+- `auth.uid()` で現在のユーザーIDを確認: `SELECT auth.uid();`
+- ユーザーのロールを確認: `SELECT role FROM user_profiles WHERE id = auth.uid();`
 
 ## 参考ドキュメント
 
-- 要件定義: `REQUIREMENTS.md`
-- プロジェクト構造: `PROJECT_STRUCTURE.md`
-- Supabaseセットアップ: `SUPABASE_SETUP.md`
+- 要件定義: [REQUIREMENTS.md](tobeDataScientist/REQUIREMENTS.md)
+- プロジェクト構造: [PROJECT_STRUCTURE.md](tobeDataScientist/PROJECT_STRUCTURE.md)
+- Supabaseセットアップ: [SUPABASE_SETUP.md](tobeDataScientist/SUPABASE_SETUP.md)
