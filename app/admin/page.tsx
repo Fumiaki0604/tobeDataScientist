@@ -263,9 +263,44 @@ export default async function AdminPage() {
                   </div>
                 </Link>
 
-                <div className="relative rounded-lg border border-gray-300 bg-gray-50 px-6 py-5 shadow-sm flex items-center space-x-3">
+                <Link
+                  href="/admin/users"
+                  className="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400"
+                >
                   <div className="flex-shrink-0">
-                    <div className="h-10 w-10 rounded-lg bg-gray-400 flex items-center justify-center">
+                    <div className="h-10 w-10 rounded-lg bg-blue-600 flex items-center justify-center">
+                      <svg
+                        className="h-6 w-6 text-white"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="absolute inset-0" aria-hidden="true" />
+                    <p className="text-sm font-medium text-gray-900">
+                      ユーザー管理
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      ユーザーの管理・ロール変更
+                    </p>
+                  </div>
+                </Link>
+
+                <Link
+                  href="/admin/analytics"
+                  className="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400"
+                >
+                  <div className="flex-shrink-0">
+                    <div className="h-10 w-10 rounded-lg bg-purple-600 flex items-center justify-center">
                       <svg
                         className="h-6 w-6 text-white"
                         fill="none"
@@ -282,16 +317,22 @@ export default async function AdminPage() {
                     </div>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-500">
-                      成績分析
+                    <span className="absolute inset-0" aria-hidden="true" />
+                    <p className="text-sm font-medium text-gray-900">
+                      分析・レポート
                     </p>
-                    <p className="text-sm text-gray-400">準備中</p>
+                    <p className="text-sm text-gray-500">
+                      統計データ・カテゴリ別分析
+                    </p>
                   </div>
-                </div>
+                </Link>
 
-                <div className="relative rounded-lg border border-gray-300 bg-gray-50 px-6 py-5 shadow-sm flex items-center space-x-3">
+                <Link
+                  href="/admin/settings"
+                  className="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400"
+                >
                   <div className="flex-shrink-0">
-                    <div className="h-10 w-10 rounded-lg bg-gray-400 flex items-center justify-center">
+                    <div className="h-10 w-10 rounded-lg bg-orange-600 flex items-center justify-center">
                       <svg
                         className="h-6 w-6 text-white"
                         fill="none"
@@ -314,12 +355,47 @@ export default async function AdminPage() {
                     </div>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-500">
+                    <span className="absolute inset-0" aria-hidden="true" />
+                    <p className="text-sm font-medium text-gray-900">
                       試験設定
                     </p>
-                    <p className="text-sm text-gray-400">準備中</p>
+                    <p className="text-sm text-gray-500">
+                      出題数・合格点などの設定
+                    </p>
                   </div>
-                </div>
+                </Link>
+
+                <Link
+                  href="/admin/export"
+                  className="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400"
+                >
+                  <div className="flex-shrink-0">
+                    <div className="h-10 w-10 rounded-lg bg-teal-600 flex items-center justify-center">
+                      <svg
+                        className="h-6 w-6 text-white"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="absolute inset-0" aria-hidden="true" />
+                    <p className="text-sm font-medium text-gray-900">
+                      データエクスポート
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      問題・試験結果・ユーザーのCSVエクスポート
+                    </p>
+                  </div>
+                </Link>
               </div>
             </div>
           </div>
