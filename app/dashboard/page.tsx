@@ -44,6 +44,12 @@ export default async function DashboardPage() {
               <span className="text-sm text-gray-500">
                 ({profile?.role === 'admin' ? '管理者' : 'ユーザー'})
               </span>
+              <Link
+                href="/dashboard/change-password"
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-md"
+              >
+                パスワード変更
+              </Link>
               <form action={handleSignOut}>
                 <button
                   type="submit"
@@ -91,9 +97,12 @@ export default async function DashboardPage() {
                   <p className="text-green-700 text-sm mb-4">
                     過去の成績を確認できます
                   </p>
-                  <button className="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
+                  <Link
+                    href="/dashboard/history"
+                    className="block w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-center"
+                  >
                     履歴を見る
-                  </button>
+                  </Link>
                 </div>
 
                 <div className="bg-purple-50 p-6 rounded-lg">

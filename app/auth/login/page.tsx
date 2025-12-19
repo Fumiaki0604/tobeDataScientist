@@ -103,12 +103,18 @@ export default function LoginPage() {
             </button>
           </div>
 
-          <div className="text-center">
+          <div className="flex items-center justify-between">
+            <Link
+              href="/auth/reset-password"
+              className="text-sm font-medium text-indigo-600 hover:text-indigo-500"
+            >
+              パスワードをお忘れの方
+            </Link>
             <Link
               href="/auth/signup"
-              className="font-medium text-indigo-600 hover:text-indigo-500"
+              className="text-sm font-medium text-indigo-600 hover:text-indigo-500"
             >
-              アカウントをお持ちでない方はこちら
+              新規登録
             </Link>
           </div>
         </form>

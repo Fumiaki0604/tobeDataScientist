@@ -114,13 +114,18 @@ app/
 ├── auth/                     # 認証関連
 │   ├── login/               # ログイン
 │   ├── signup/              # 新規登録
-│   └── callback/            # OAuth コールバック
+│   ├── reset-password/      # パスワードリセット
+│   └── update-password/     # パスワード更新
 ├── dashboard/               # ダッシュボード
+│   ├── history/            # 学習履歴
+│   │   └── [id]/          # 学習履歴詳細
+│   └── change-password/   # パスワード変更
 ├── exam/                    # 試験機能
 │   ├── start/              # 試験設定・開始
 │   └── [sessionId]/        # 試験実施・結果
 └── admin/                   # 管理者機能
     ├── questions/          # 問題管理
+    ├── categories/         # カテゴリ管理
     └── pdfs/               # PDF管理
 
 lib/
@@ -151,23 +156,40 @@ supabase/
 
 ### Phase 1: 基盤構築 ✅ 完了
 - 認証機能（ログイン、新規登録、ログアウト）
+- パスワードリセット・変更機能
 - ダッシュボード
 - ミドルウェアによる認証保護
 
-### Phase 2: 試験機能 🚧 部分的に実装
+### Phase 2: 試験機能 ✅ 完了
 - 試験開始画面 ([app/exam/start/page.tsx](tobeDataScientist/app/exam/start/page.tsx))
 - 試験実施画面 ([app/exam/[sessionId]/page.tsx](tobeDataScientist/app/exam/[sessionId]/page.tsx))
 - 試験結果画面 ([app/exam/[sessionId]/result/page.tsx](tobeDataScientist/app/exam/[sessionId]/result/page.tsx))
 
-### Phase 3: 管理者機能 🚧 部分的に実装
+### Phase 3: 管理者機能 ✅ 完了（優先度1機能）
 - 問題管理画面 ([app/admin/questions/page.tsx](tobeDataScientist/app/admin/questions/page.tsx))
+  - 検索・フィルタリング機能（テキスト検索、カテゴリ、承認状態、難易度、ソース）
 - 問題作成・編集 ([app/admin/questions/new/page.tsx](tobeDataScientist/app/admin/questions/new/page.tsx))
+- カテゴリ管理 ([app/admin/categories/page.tsx](tobeDataScientist/app/admin/categories/page.tsx))
+  - 親子階層構造対応
+  - 安全な削除チェック
 - PDF管理 ([app/admin/pdfs/page.tsx](tobeDataScientist/app/admin/pdfs/page.tsx))
 
-### Phase 4-7: 未実装
-- AI問題生成の完全統合
-- 学習履歴・詳細分析
-- カテゴリ管理UI
+### Phase 4: AI問題生成 ✅ 完了
+- AI問題生成エンドポイント ([app/api/generate-questions/route.ts](tobeDataScientist/app/api/generate-questions/route.ts))
+- PDF抽出機能
+
+### Phase 5: 学習履歴機能 ✅ 完了
+- 学習履歴一覧 ([app/dashboard/history/page.tsx](tobeDataScientist/app/dashboard/history/page.tsx))
+  - 統計情報（受験回数、合格回数、平均点）
+  - 過去のセッション一覧
+- 学習履歴詳細 ([app/dashboard/history/[id]/page.tsx](tobeDataScientist/app/dashboard/history/[id]/page.tsx))
+  - 問題ごとの正解・不正解表示
+  - 解説表示
+
+### 未実装（優先度2以降）
+- ユーザー管理UI（管理者向け）
+- 試験設定管理UI（出題数、合格点などの設定）
+- 分析・レポート機能（カテゴリ別正答率など）
 - データエクスポート機能
 
 ## Supabaseデータベースの初期セットアップ
