@@ -34,11 +34,12 @@ npm run lint
 
 - **Next.js 14** (App Router) - サーバーコンポーネントとクライアントコンポーネントの使い分けに注意
 - **Supabase** - PostgreSQL + 認証 + ストレージ
-- **TypeScript** - 型定義は `types/database.ts` を参照
+- **TypeScript** - 型定義は `types/database.ts`, `types/slack.ts` を参照
 - **Tailwind CSS** - スタイリング
 - **OpenAI API** - AI問題生成 (gpt-4など)
 - **pdf-parse** - PDFファイルからのテキスト抽出
 - **Recharts** - データ可視化・グラフ表示
+- **@slack/web-api** - Slack連携・日次配信機能
 
 ## アーキテクチャ
 
@@ -79,7 +80,9 @@ RLSポリシーの詳細は `supabase/rls-policies.sql` を参照。
 
 ### データベーススキーマの重要ポイント
 
-**8つの主要テーブル**:
+**主要テーブル**:
+
+**コア機能テーブル** (8つ):
 1. `user_profiles` - ユーザー情報拡張 (role管理)
 2. `categories` - 階層構造のカテゴリ (parent_id)
 3. `questions` - 4択問題 (is_approved フラグ重要)
@@ -89,16 +92,37 @@ RLSポリシーの詳細は `supabase/rls-policies.sql` を参照。
 7. `pdf_sources` - PDFファイル管理
 8. `ai_generation_logs` - AI生成履歴
 
-詳細は `supabase/schema.sql` を参照。
+**Slack連携テーブル** (7つ):
+1. `slack_integrations` - Slack OAuth情報とワークスペース連携
+2. `slack_daily_delivery_settings` - 配信設定（時刻、チャンネル、出題設定）
+3. `slack_daily_deliveries` - 配信実績ログ（問題、ステータス、統計）
+4. `slack_answers` - Slackからの回答記録（連続記録計算用）
+5. `slack_gamification_streaks` - 連続正答日数管理
+6. `slack_achievements` - アチーブメント・バッジ
+7. `slack_user_mappings` - SlackユーザーとSupabaseユーザーの紐付け
+
+詳細は `supabase/schema.sql` と `supabase/migrations/20260101000000_slack_integration.sql` を参照。
 
 ## 開発時の注意点
 
 ### 環境変数
 
 `.env.local` ファイルが必要（`.env.example` をコピー）:
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `OPENAI_API_KEY`
+
+**必須の環境変数**:
+- `NEXT_PUBLIC_SUPABASE_URL` - SupabaseプロジェクトURL
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Supabase匿名キー
+- `OPENAI_API_KEY` - OpenAI APIキー（AI問題生成用）
+- `NEXT_PUBLIC_APP_URL` - アプリケーションURL（本番: Vercel URL、ローカル: http://localhost:3000）
+
+**Slack連携の環境変数**（Phase 7実装時に必要）:
+- `SLACK_CLIENT_ID` - Slack AppのClient ID
+- `SLACK_CLIENT_SECRET` - Slack AppのClient Secret
+- `SLACK_SIGNING_SECRET` - Slack AppのSigning Secret（署名検証用）
+- `SLACK_TOKEN_ENCRYPTION_KEY` - トークン暗号化鍵（64文字のhex、`openssl rand -hex 32` で生成）
+- `CRON_SECRET` - Vercel Cron認証用シークレット（`openssl rand -hex 32` で生成）
+
+**重要**: Slack関連の環境変数は、Slack App作成後に設定する。
 
 ### Server Actions
 
@@ -111,10 +135,16 @@ Server Actionsを使用する場合は `'use server'` ディレクティブが�
 app/
 ├── api/                      # API Routes
 │   ├── generate-questions/   # AI問題生成エンドポイント
-│   └── export/              # データエクスポートAPI
-│       ├── questions/       # 問題データエクスポート
-│       ├── sessions/        # 試験結果エクスポート
-│       └── users/           # ユーザーデータエクスポート
+│   ├── export/              # データエクスポートAPI
+│   │   ├── questions/       # 問題データエクスポート
+│   │   ├── sessions/        # 試験結果エクスポート
+│   │   └── users/           # ユーザーデータエクスポート
+│   ├── slack/               # Slack連携API（Phase 7）
+│   │   ├── oauth/callback/  # Slack OAuth認証コールバック
+│   │   ├── interactions/    # インタラクティブボタン処理（Phase 7）
+│   │   └── events/          # Slackイベント受信（Phase 7、オプション）
+│   └── cron/                # Vercel Cron Jobs（Phase 7）
+│       └── send-daily-questions/  # 日次配信
 ├── auth/                     # 認証関連
 │   ├── login/               # ログイン
 │   ├── signup/              # 新規登録
@@ -134,23 +164,34 @@ app/
     ├── settings/           # 試験設定
     ├── analytics/          # 分析・レポート
     ├── export/             # データエクスポート
-    └── pdfs/               # PDF管理
+    ├── pdfs/               # PDF管理
+    └── slack/              # Slack連携管理（Phase 7）
+        ├── settings/       # 配信設定（Phase 7）
+        └── history/        # 配信履歴（Phase 7）
 
 lib/
-└── supabase/               # Supabaseクライアント設定
+├── supabase/               # Supabaseクライアント設定
+└── slack/                  # Slack連携ライブラリ（Phase 7）
+    ├── crypto.ts           # トークン暗号化/復号化（AES-256-GCM）
+    ├── signature.ts        # Slack署名検証（セキュリティ）
+    ├── messages.ts         # Block Kitメッセージ生成（Phase 7）
+    └── gamification.ts     # ゲーミフィケーションロジック（Phase 7）
 
 types/
-└── database.ts             # データベース型定義
+├── database.ts             # データベース型定義
+└── slack.ts                # Slack関連型定義（Phase 7）
 
 supabase/
-├── schema.sql              # テーブル定義
+├── schema.sql              # コアテーブル定義
+├── migrations/
+│   └── 20260101000000_slack_integration.sql  # Slack連携テーブル（Phase 7）
 ├── rls-policies.sql        # RLSポリシー
 └── seed-data.sql           # 初期データ
 ```
 
 ### 型安全性
 
-- データベースの型定義: [types/database.ts](tobeDataScientist/types/database.ts)
+- データベースの型定義: [types/database.ts](tobeDataScientist/types/database.ts), [types/slack.ts](tobeDataScientist/types/slack.ts)
 - Supabaseクエリの戻り値は適切に型付けする
 - `AnswerOption` 型は `'a' | 'b' | 'c' | 'd'` のみ
 - 主要な型:
@@ -159,6 +200,9 @@ supabase/
   - `ExamSession` - 試験セッション
   - `ExamAnswer` - 個別回答記録
   - `Category` - カテゴリ（階層構造対応）
+  - `SlackIntegration` - Slack連携情報（Phase 7）
+  - `SlackDailyDeliverySetting` - Slack配信設定（Phase 7）
+  - `SlackAnswer` - Slack回答記録（Phase 7）
 
 ## 開発フェーズと実装状況
 
@@ -211,6 +255,77 @@ supabase/
   - 試験結果CSVエクスポート
   - ユーザーデータCSVエクスポート
 
+### Phase 7: Slack連携機能 🚧 実装中（Phase 1完了）
+
+**概要**: Slackワークスペースと連携し、毎日1問を自動配信する機能。
+
+**実装済み（Phase 1: 基盤構築）**:
+- データベーステーブル作成 ([supabase/migrations/20260101000000_slack_integration.sql](tobeDataScientist/supabase/migrations/20260101000000_slack_integration.sql))
+  - 7つのSlack連携テーブル（integrations, settings, deliveries, answers, streaks, achievements, mappings）
+  - RLSポリシーとトリガー設定
+- トークン暗号化機能 ([lib/slack/crypto.ts](tobeDataScientist/lib/slack/crypto.ts))
+  - AES-256-GCMによる暗号化/復号化
+  - 環境変数 `SLACK_TOKEN_ENCRYPTION_KEY` を使用
+- Slack署名検証 ([lib/slack/signature.ts](tobeDataScientist/lib/slack/signature.ts))
+  - HMAC-SHA256による署名検証
+  - リプレイ攻撃対策（5分以内のリクエストのみ許可）
+- OAuth認証フロー ([app/api/slack/oauth/callback/route.ts](tobeDataScientist/app/api/slack/oauth/callback/route.ts))
+  - Slack OAuth 2.0認証
+  - トークン暗号化保存
+- 管理画面UI ([app/admin/slack/page.tsx](tobeDataScientist/app/admin/slack/page.tsx))
+  - Slack連携開始・解除
+  - ワークスペース情報表示
+- Slack型定義 ([types/slack.ts](tobeDataScientist/types/slack.ts))
+
+**未実装（Phase 2-6）**:
+- Phase 2: 日次配信機能（Vercel Cron、Block Kitメッセージ）
+- Phase 3: 回答処理（インタラクティブボタン、結果通知）
+- Phase 4: ゲーミフィケーション（連続正答日数、アチーブメント）
+- Phase 5: 管理画面（配信設定、配信履歴、統計）
+- Phase 6: エラーハンドリング・最適化
+
+**詳細**: 実装計画は [SLACK_IMPLEMENTATION_PLAN.md](tobeDataScientist/SLACK_IMPLEMENTATION_PLAN.md) を参照。
+
+### Slack連携の重要な実装パターン
+
+**トークン暗号化**:
+```typescript
+import { encryptToken, decryptToken } from '@/lib/slack/crypto'
+
+// 暗号化（OAuth時）
+const encrypted = await encryptToken(accessToken)
+
+// 復号化（API呼び出し時）
+const token = await decryptToken(encryptedToken)
+```
+
+**署名検証**（セキュリティ必須）:
+```typescript
+import { verifySlackSignature } from '@/lib/slack/signature'
+
+const body = await request.text()
+const timestamp = request.headers.get('x-slack-request-timestamp')!
+const signature = request.headers.get('x-slack-signature')!
+
+if (!verifySlackSignature(body, timestamp, signature)) {
+  return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+}
+```
+
+**Slack 3秒ルール対応**:
+Slackのインタラクティブエンドポイントは3秒以内に応答必須。長時間処理は非同期化する:
+```typescript
+export async function POST(request: NextRequest) {
+  const payload = parsePayload(request)
+
+  // 即座に200 OKを返す
+  const processingPromise = handleInteraction(payload)
+  processingPromise.catch(console.error)
+
+  return NextResponse.json({ ok: true })
+}
+```
+
 ## Supabaseデータベースの初期セットアップ
 
 新しい環境でセットアップする場合:
@@ -219,8 +334,9 @@ supabase/
 2. `.env.local` ファイルを作成し、環境変数を設定
 3. SQL Editorで [supabase/schema.sql](tobeDataScientist/supabase/schema.sql) を実行
 4. SQL Editorで [supabase/rls-policies.sql](tobeDataScientist/supabase/rls-policies.sql) を実行
-5. (オプション) 初期データ投入: [supabase/seed-data.sql](tobeDataScientist/supabase/seed-data.sql) を実行
-6. Storage バケット `exam-pdfs` を作成（プライベート設定）
+5. (オプション) Slack連携を使う場合: [supabase/migrations/20260101000000_slack_integration.sql](tobeDataScientist/supabase/migrations/20260101000000_slack_integration.sql) を実行
+6. (オプション) 初期データ投入: [supabase/seed-data.sql](tobeDataScientist/supabase/seed-data.sql) を実行
+7. Storage バケット `exam-pdfs` を作成（プライベート設定）
 
 ## よくある開発タスク
 
@@ -240,8 +356,25 @@ supabase/
 - `auth.uid()` で現在のユーザーIDを確認: `SELECT auth.uid();`
 - ユーザーのロールを確認: `SELECT role FROM user_profiles WHERE id = auth.uid();`
 
+### Slack連携のセットアップ（Phase 7使用時）
+
+1. Slack Appを作成（https://api.slack.com/apps）
+2. OAuth & Permissions でBot Token Scopesを追加:
+   - `chat:write`, `chat:write.public`, `channels:read`, `users:read`, `im:write`
+3. OAuth Redirect URLsを設定:
+   - 開発環境: `http://localhost:3000/api/slack/oauth/callback`
+   - 本番環境: `https://your-app.vercel.app/api/slack/oauth/callback`
+4. Interactivity & Shortcuts でRequest URLを設定:
+   - `https://your-app.vercel.app/api/slack/interactions`
+5. 環境変数を設定（`.env.local`）:
+   - `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_SIGNING_SECRET`
+   - `SLACK_TOKEN_ENCRYPTION_KEY`（`openssl rand -hex 32`で生成）
+   - `CRON_SECRET`（`openssl rand -hex 32`で生成）
+6. `/admin/slack` にアクセスして「Slackと連携する」をクリック
+
 ## 参考ドキュメント
 
 - 要件定義: [REQUIREMENTS.md](tobeDataScientist/REQUIREMENTS.md)
 - プロジェクト構造: [PROJECT_STRUCTURE.md](tobeDataScientist/PROJECT_STRUCTURE.md)
 - Supabaseセットアップ: [SUPABASE_SETUP.md](tobeDataScientist/SUPABASE_SETUP.md)
+- Slack連携実装計画: [SLACK_IMPLEMENTATION_PLAN.md](tobeDataScientist/SLACK_IMPLEMENTATION_PLAN.md)

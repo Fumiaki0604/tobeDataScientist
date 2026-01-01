@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@slack/web-api": "^7.11.0",
     "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.78.0",
