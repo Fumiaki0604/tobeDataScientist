@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
-        client_id: process.env.SLACK_CLIENT_ID!,
+        client_id: process.env.NEXT_PUBLIC_SLACK_CLIENT_ID!,
         client_secret: process.env.SLACK_CLIENT_SECRET!,
         code,
         redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/slack/oauth/callback`,
