@@ -4,5 +4,6 @@
       "path": "/api/cron/send-daily-questions",
       "schedule": "0 * * * *"
     }
-  ]
+  ],
+  "buildCommand": "npm run build"
 }
