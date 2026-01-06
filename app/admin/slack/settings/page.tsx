@@ -38,6 +38,7 @@ export default function SlackSettingsPage() {
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState(false)
   const [channels, setChannels] = useState<Channel[]>([])
   const [settings, setSettings] = useState<DeliverySettings | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -183,6 +184,39 @@ export default function SlackSettingsPage() {
         ? prev.filter((c) => c !== category)
         : [...prev, category]
     )
+  }
+
+  const handleTestDelivery = async () => {
+    if (!settings) {
+      setError('設定を保存してからテスト配信を実行してください')
+      return
+    }
+
+    setError(null)
+    setSuccess(null)
+
+    try {
+      setTesting(true)
+
+      const response = await fetch('/api/slack/test-delivery', {
+        method: 'POST',
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Test delivery failed')
+      }
+
+      setSuccess(
+        `テスト配信が成功しました！チャンネル「#${data.channel}」を確認してください。`
+      )
+    } catch (err: any) {
+      console.error('Error in test delivery:', err)
+      setError(err.message)
+    } finally {
+      setTesting(false)
+    }
   }
 
   if (loading) {
@@ -381,7 +415,15 @@ export default function SlackSettingsPage() {
                 </div>
               </div>
 
-              <div className="px-4 py-3 bg-gray-50 text-right sm:px-6 rounded-b-lg">
+              <div className="px-4 py-3 bg-gray-50 text-right sm:px-6 rounded-b-lg flex justify-between items-center">
+                <button
+                  type="button"
+                  onClick={handleTestDelivery}
+                  disabled={testing || !settings}
+                  className="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                >
+                  {testing ? 'テスト中...' : 'テスト配信'}
+                </button>
                 <button
                   type="submit"
                   disabled={saving}
