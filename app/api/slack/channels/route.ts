@@ -1,0 +1,75 @@
+import { NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { WebClient } from '@slack/web-api'
+import { decryptToken } from '@/lib/slack/crypto'
+
+export const dynamic = 'force-dynamic'
+
+/**
+ * Slackチャンネル一覧を取得
+ */
+export async function GET() {
+  try {
+    const supabase = await createClient()
+
+    // ユーザー認証チェック
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // 管理者チェック
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    if (profile?.role !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    // アクティブなSlack連携を取得
+    const { data: integration, error: integrationError } = await supabase
+      .from('slack_integrations')
+      .select('*')
+      .eq('is_active', true)
+      .single()
+
+    if (integrationError || !integration) {
+      return NextResponse.json(
+        { error: 'No active Slack integration' },
+        { status: 404 }
+      )
+    }
+
+    // Slack Botトークンを復号化
+    const botToken = await decryptToken(integration.access_token_encrypted)
+    const slack = new WebClient(botToken)
+
+    // チャンネル一覧を取得
+    const result = await slack.conversations.list({
+      exclude_archived: true,
+      types: 'public_channel,private_channel',
+    })
+
+    const channels =
+      result.channels?.map((channel: any) => ({
+        id: channel.id,
+        name: channel.name,
+        is_private: channel.is_private,
+        is_member: channel.is_member,
+      })) || []
+
+    return NextResponse.json({ channels })
+  } catch (error: any) {
+    console.error('Error fetching channels:', error)
+    return NextResponse.json(
+      { error: error.message || 'Failed to fetch channels' },
+      { status: 500 }
+    )
+  }
+}
