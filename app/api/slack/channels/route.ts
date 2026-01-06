@@ -50,9 +50,11 @@ export async function GET() {
     const botToken = await decryptToken(integration.access_token_encrypted)
     const slack = new WebClient(botToken)
 
-    // チャンネル一覧を取得（ページネーション対応）
+    // チャンネル一覧を取得（ページネーション対応、レート制限考慮）
     const allChannels: any[] = []
     let cursor: string | undefined = undefined
+    let pageCount = 0
+    const maxPages = 10 // 最大10ページ（2000チャンネル）まで取得
 
     do {
       const result = await slack.conversations.list({
@@ -67,7 +69,13 @@ export async function GET() {
       }
 
       cursor = result.response_metadata?.next_cursor
-    } while (cursor)
+      pageCount++
+
+      // 次のページがある場合は1秒待機（レート制限回避）
+      if (cursor && pageCount < maxPages) {
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+      }
+    } while (cursor && pageCount < maxPages)
 
     const channels = allChannels.map((channel: any) => ({
       id: channel.id,
