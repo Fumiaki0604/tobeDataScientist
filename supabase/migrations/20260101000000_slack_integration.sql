@@ -27,49 +27,45 @@ CREATE TABLE IF NOT EXISTS public.slack_integrations (
 -- 2. 日次配信設定テーブル
 CREATE TABLE IF NOT EXISTS public.slack_daily_delivery_settings (
     id SERIAL PRIMARY KEY,
-    slack_integration_id INTEGER NOT NULL REFERENCES public.slack_integrations(id) ON DELETE CASCADE,
+    workspace_id TEXT NOT NULL UNIQUE,
 
     -- 配信設定
     channel_id TEXT NOT NULL,
     channel_name TEXT,
-    delivery_time TIME NOT NULL DEFAULT '09:00:00', -- JST 9:00
-    timezone TEXT NOT NULL DEFAULT 'Asia/Tokyo',
+    delivery_time TEXT NOT NULL DEFAULT '09:00', -- HH:mm format
 
-    -- 出題設定
-    category_ids INTEGER[], -- NULL = 全カテゴリ
-    difficulty_min INTEGER DEFAULT 1,
-    difficulty_max INTEGER DEFAULT 5,
-    only_approved BOOLEAN DEFAULT TRUE,
+    -- フィルタ設定
+    difficulty_filter TEXT[], -- NULL = 全難易度
+    category_filter TEXT[], -- NULL = 全カテゴリ
 
     -- 状態
-    is_enabled BOOLEAN DEFAULT TRUE,
+    is_active BOOLEAN DEFAULT TRUE,
 
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-
-    UNIQUE(slack_integration_id, channel_id)
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- 3. 日次配信実績ログテーブル
 CREATE TABLE IF NOT EXISTS public.slack_daily_deliveries (
     id SERIAL PRIMARY KEY,
-    setting_id INTEGER NOT NULL REFERENCES public.slack_daily_delivery_settings(id) ON DELETE CASCADE,
+    workspace_id TEXT NOT NULL,
+    channel_id TEXT NOT NULL,
+    channel_name TEXT,
 
     -- 配信情報
     question_id INTEGER NOT NULL REFERENCES public.questions(id) ON DELETE CASCADE,
     delivered_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
     -- Slack メッセージ情報
-    message_ts TEXT NOT NULL, -- Slackのタイムスタンプ（メッセージID）
-    channel_id TEXT NOT NULL,
+    message_ts TEXT, -- Slackのタイムスタンプ（メッセージID）
 
     -- ステータス
-    status TEXT NOT NULL DEFAULT 'sent' CHECK (status IN ('sent', 'failed', 'expired')),
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'delivered', 'failed')),
     error_message TEXT,
 
     -- 統計
-    total_responses INTEGER DEFAULT 0,
-    correct_responses INTEGER DEFAULT 0,
+    total_answers INTEGER DEFAULT 0,
+    correct_answers INTEGER DEFAULT 0,
 
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
