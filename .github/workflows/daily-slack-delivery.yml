@@ -13,7 +13,7 @@ jobs:
     steps:
       - name: Send Daily Question to Slack
         run: |
-          response=$(curl -s -w "\n%{http_code}" -X GET \
+          response=$(curl -s -L -w "\n%{http_code}" -X GET \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             https://ds-exam-app.vercel.app/api/cron/send-daily-questions)
 
