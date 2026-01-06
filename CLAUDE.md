@@ -116,13 +116,15 @@ RLSポリシーの詳細は `supabase/rls-policies.sql` を参照。
 - `NEXT_PUBLIC_APP_URL` - アプリケーションURL（本番: Vercel URL、ローカル: http://localhost:3000）
 
 **Slack連携の環境変数**（Phase 7実装時に必要）:
-- `SLACK_CLIENT_ID` - Slack AppのClient ID
-- `SLACK_CLIENT_SECRET` - Slack AppのClient Secret
+- `NEXT_PUBLIC_SLACK_CLIENT_ID` - Slack AppのClient ID（クライアント側で使用するためNEXT_PUBLIC_プレフィックスが必要）
+- `SLACK_CLIENT_SECRET` - Slack AppのClient Secret（サーバー側のみ）
 - `SLACK_SIGNING_SECRET` - Slack AppのSigning Secret（署名検証用）
 - `SLACK_TOKEN_ENCRYPTION_KEY` - トークン暗号化鍵（64文字のhex、`openssl rand -hex 32` で生成）
 - `CRON_SECRET` - Vercel Cron認証用シークレット（`openssl rand -hex 32` で生成）
 
-**重要**: Slack関連の環境変数は、Slack App作成後に設定する。
+**重要**:
+- Slack関連の環境変数は、Slack App作成後に設定する
+- `NEXT_PUBLIC_SLACK_CLIENT_ID` はクライアント側のOAuth URLビルドで使用されるため、NEXT_PUBLIC_プレフィックスが必須
 
 ### Server Actions
 
@@ -366,8 +368,8 @@ export async function POST(request: NextRequest) {
    - 本番環境: `https://your-app.vercel.app/api/slack/oauth/callback`
 4. Interactivity & Shortcuts でRequest URLを設定:
    - `https://your-app.vercel.app/api/slack/interactions`
-5. 環境変数を設定（`.env.local`）:
-   - `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_SIGNING_SECRET`
+5. 環境変数を設定（`.env.local` と Vercel）:
+   - `NEXT_PUBLIC_SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_SIGNING_SECRET`
    - `SLACK_TOKEN_ENCRYPTION_KEY`（`openssl rand -hex 32`で生成）
    - `CRON_SECRET`（`openssl rand -hex 32`で生成）
 6. `/admin/slack` にアクセスして「Slackと連携する」をクリック
