@@ -256,12 +256,18 @@ export default function SlackSettingsPage() {
                       id="channel"
                       value={selectedChannel}
                       onChange={(e) => setSelectedChannel(e.target.value)}
-                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base text-gray-900 border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
                       required
                     >
-                      <option value="">チャンネルを選択...</option>
+                      <option value="" className="text-gray-500">
+                        チャンネルを選択...
+                      </option>
                       {channels.map((channel) => (
-                        <option key={channel.id} value={channel.id}>
+                        <option
+                          key={channel.id}
+                          value={channel.id}
+                          className="text-gray-900"
+                        >
                           {channel.is_private ? '🔒' : '#'} {channel.name}
                           {!channel.is_member && ' (未参加)'}
                         </option>

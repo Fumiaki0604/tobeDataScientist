@@ -50,19 +50,31 @@ export async function GET() {
     const botToken = await decryptToken(integration.access_token_encrypted)
     const slack = new WebClient(botToken)
 
-    // チャンネル一覧を取得
-    const result = await slack.conversations.list({
-      exclude_archived: true,
-      types: 'public_channel,private_channel',
-    })
+    // チャンネル一覧を取得（ページネーション対応）
+    const allChannels: any[] = []
+    let cursor: string | undefined = undefined
 
-    const channels =
-      result.channels?.map((channel: any) => ({
-        id: channel.id,
-        name: channel.name,
-        is_private: channel.is_private,
-        is_member: channel.is_member,
-      })) || []
+    do {
+      const result = await slack.conversations.list({
+        exclude_archived: true,
+        types: 'public_channel,private_channel',
+        limit: 200,
+        cursor,
+      })
+
+      if (result.channels) {
+        allChannels.push(...result.channels)
+      }
+
+      cursor = result.response_metadata?.next_cursor
+    } while (cursor)
+
+    const channels = allChannels.map((channel: any) => ({
+      id: channel.id,
+      name: channel.name,
+      is_private: channel.is_private,
+      is_member: channel.is_member,
+    }))
 
     return NextResponse.json({ channels })
   } catch (error: any) {
