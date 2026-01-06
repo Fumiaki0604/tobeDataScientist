@@ -93,6 +93,7 @@ export default function SlackAdminPage() {
       'chat:write',
       'chat:write.public',
       'channels:read',
+      'groups:read',
       'users:read',
       'im:write',
     ].join(',')
