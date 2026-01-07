@@ -51,8 +51,8 @@ export default function SlackSettingsPage() {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   const [isActive, setIsActive] = useState(true)
   const [channelSearch, setChannelSearch] = useState('')
-  const [manualChannelId, setManualChannelId] = useState('')
-  const [useManualInput, setUseManualInput] = useState(false)
+  const [manualChannelId, setManualChannelId] = useState('C061Q3XQMPA') // sato_invest チャンネルをデフォルトに
+  const [useManualInput, setUseManualInput] = useState(true) // デフォルトで手動入力モードをON
 
   useEffect(() => {
     checkAdminAccess()
