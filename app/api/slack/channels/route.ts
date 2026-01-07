@@ -77,6 +77,19 @@ export async function GET() {
       }
     } while (cursor && pageCount < maxPages)
 
+    // デバッグ: 全チャンネル数とsato_investの存在確認
+    console.log('Total channels fetched:', allChannels.length)
+    const satoInvest = allChannels.find((ch: any) => ch.name === 'sato_invest')
+    if (satoInvest) {
+      console.log('sato_invest found:', {
+        name: satoInvest.name,
+        is_member: satoInvest.is_member,
+        is_private: satoInvest.is_private,
+      })
+    } else {
+      console.log('sato_invest NOT FOUND in fetched channels')
+    }
+
     // Botが参加しているチャンネルのみフィルタ
     const channels = allChannels
       .filter((channel: any) => channel.is_member)
@@ -86,6 +99,8 @@ export async function GET() {
         is_private: channel.is_private,
         is_member: channel.is_member,
       }))
+
+    console.log('Filtered member channels:', channels.length)
 
     return NextResponse.json({ channels })
   } catch (error: any) {
