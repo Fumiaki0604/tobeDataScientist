@@ -54,7 +54,7 @@ export async function GET() {
     const allChannels: any[] = []
     let cursor: string | undefined = undefined
     let pageCount = 0
-    const maxPages = 15 // 最大15ページまで取得（Vercel 10秒タイムアウト対策）
+    const maxPages = 20 // 最大20ページまで取得（Vercel 10秒タイムアウトギリギリ）
 
     do {
       const result = await slack.conversations.list({
@@ -73,9 +73,9 @@ export async function GET() {
 
       console.log(`Page ${pageCount}: fetched ${result.channels?.length || 0} channels, cursor: ${cursor ? 'exists' : 'none'}`)
 
-      // 次のページがある場合は0.5秒待機（レート制限回避、タイムアウト対策）
+      // 次のページがある場合は0.3秒待機（レート制限回避、タイムアウト対策）
       if (cursor && pageCount < maxPages) {
-        await new Promise((resolve) => setTimeout(resolve, 500))
+        await new Promise((resolve) => setTimeout(resolve, 300))
       }
     } while (cursor && pageCount < maxPages)
 
