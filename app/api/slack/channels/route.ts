@@ -71,11 +71,15 @@ export async function GET() {
       cursor = result.response_metadata?.next_cursor
       pageCount++
 
+      console.log(`Page ${pageCount}: fetched ${result.channels?.length || 0} channels, cursor: ${cursor ? 'exists' : 'none'}`)
+
       // 次のページがある場合は1秒待機（レート制限回避）
       if (cursor && pageCount < maxPages) {
         await new Promise((resolve) => setTimeout(resolve, 1000))
       }
     } while (cursor && pageCount < maxPages)
+
+    console.log(`Total pages fetched: ${pageCount}, total channels: ${allChannels.length}`)
 
     // 全チャンネルを返す（is_memberフラグが正確でないため、フィルタしない）
     const channels = allChannels.map((channel: any) => ({
