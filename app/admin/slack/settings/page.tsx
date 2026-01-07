@@ -51,6 +51,8 @@ export default function SlackSettingsPage() {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   const [isActive, setIsActive] = useState(true)
   const [channelSearch, setChannelSearch] = useState('')
+  const [manualChannelId, setManualChannelId] = useState('')
+  const [useManualInput, setUseManualInput] = useState(false)
 
   useEffect(() => {
     checkAdminAccess()
@@ -126,14 +128,18 @@ export default function SlackSettingsPage() {
     setError(null)
     setSuccess(null)
 
-    if (!selectedChannel) {
-      setError('配信先チャンネルを選択してください')
+    const channelId = useManualInput ? manualChannelId : selectedChannel
+    const channelName = useManualInput
+      ? manualChannelId
+      : channels.find((c) => c.id === selectedChannel)?.name || ''
+
+    if (!channelId) {
+      setError('配信先チャンネルを選択または入力してください')
       return
     }
 
-    const channel = channels.find((c) => c.id === selectedChannel)
-    if (!channel) {
-      setError('選択されたチャンネルが見つかりません')
+    if (useManualInput && !manualChannelId.match(/^C[A-Z0-9]+$/)) {
+      setError('チャンネルIDの形式が正しくありません（例: C061Q3XQMPA）')
       return
     }
 
@@ -144,8 +150,8 @@ export default function SlackSettingsPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          channel_id: selectedChannel,
-          channel_name: channel.name,
+          channel_id: channelId,
+          channel_name: channelName,
           delivery_time: deliveryTime,
           difficulty_filter:
             selectedDifficulties.length > 0 ? selectedDifficulties : null,
@@ -281,50 +287,86 @@ export default function SlackSettingsPage() {
                 <div className="space-y-6">
                   {/* チャンネル選択 */}
                   <div>
-                    <label
-                      htmlFor="channel"
-                      className="block text-sm font-medium text-gray-700"
-                    >
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                       配信先チャンネル
                     </label>
-                    <input
-                      type="text"
-                      placeholder="チャンネル名で検索..."
-                      value={channelSearch}
-                      onChange={(e) => setChannelSearch(e.target.value)}
-                      className="mt-1 block w-full px-3 py-2 text-base text-gray-900 border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-                    />
-                    <select
-                      id="channel"
-                      value={selectedChannel}
-                      onChange={(e) => setSelectedChannel(e.target.value)}
-                      className="mt-2 block w-full pl-3 pr-10 py-2 text-base text-gray-900 border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-                      required
-                      size={10}
-                    >
-                      <option value="" className="text-gray-500">
-                        チャンネルを選択...
-                      </option>
-                      {channels
-                        .filter((channel) =>
-                          channel.name
-                            .toLowerCase()
-                            .includes(channelSearch.toLowerCase())
-                        )
-                        .map((channel) => (
-                          <option
-                            key={channel.id}
-                            value={channel.id}
-                            className="text-gray-900"
-                          >
-                            {channel.is_private ? '🔒' : '#'} {channel.name}
+
+                    {/* チャンネルID直接入力オプション */}
+                    <div className="flex items-center mb-3">
+                      <input
+                        type="checkbox"
+                        id="useManualInput"
+                        checked={useManualInput}
+                        onChange={(e) => setUseManualInput(e.target.checked)}
+                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                      />
+                      <label
+                        htmlFor="useManualInput"
+                        className="ml-2 text-sm text-gray-700"
+                      >
+                        チャンネルIDを直接入力する
+                      </label>
+                    </div>
+
+                    {useManualInput ? (
+                      <>
+                        <input
+                          type="text"
+                          placeholder="例: C061Q3XQMPA"
+                          value={manualChannelId}
+                          onChange={(e) =>
+                            setManualChannelId(e.target.value.trim())
+                          }
+                          className="block w-full px-3 py-2 text-base text-gray-900 border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                          required={useManualInput}
+                        />
+                        <p className="mt-2 text-sm text-gray-500">
+                          チャンネルIDは、Slackでチャンネル詳細を開き、最下部に表示されています
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <input
+                          type="text"
+                          placeholder="チャンネル名で検索..."
+                          value={channelSearch}
+                          onChange={(e) => setChannelSearch(e.target.value)}
+                          className="block w-full px-3 py-2 text-base text-gray-900 border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                        />
+                        <select
+                          id="channel"
+                          value={selectedChannel}
+                          onChange={(e) => setSelectedChannel(e.target.value)}
+                          className="mt-2 block w-full pl-3 pr-10 py-2 text-base text-gray-900 border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                          required={!useManualInput}
+                          size={10}
+                        >
+                          <option value="" className="text-gray-500">
+                            チャンネルを選択...
                           </option>
-                        ))}
-                    </select>
-                    <p className="mt-2 text-sm text-gray-500">
-                      検索して絞り込むか、スクロールして選択してください（最大
-                      {channels.length}件表示中）
-                    </p>
+                          {channels
+                            .filter((channel) =>
+                              channel.name
+                                .toLowerCase()
+                                .includes(channelSearch.toLowerCase())
+                            )
+                            .map((channel) => (
+                              <option
+                                key={channel.id}
+                                value={channel.id}
+                                className="text-gray-900"
+                              >
+                                {channel.is_private ? '🔒' : '#'}{' '}
+                                {channel.name}
+                              </option>
+                            ))}
+                        </select>
+                        <p className="mt-2 text-sm text-gray-500">
+                          検索して絞り込むか、スクロールして選択してください（最大
+                          {channels.length}件表示中）
+                        </p>
+                      </>
+                    )}
                   </div>
 
                   {/* 配信時刻 */}
