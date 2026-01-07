@@ -303,7 +303,6 @@ export default function SlackSettingsPage() {
                           className="text-gray-900"
                         >
                           {channel.is_private ? '🔒' : '#'} {channel.name}
-                          {!channel.is_member && ' (未参加)'}
                         </option>
                       ))}
                     </select>
@@ -443,7 +442,7 @@ export default function SlackSettingsPage() {
             <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
               <li>配信時刻は日本時間（JST）で設定されます</li>
               <li>
-                プライベートチャンネルに配信する場合は、事前にBotをチャンネルに招待してください
+                Botが参加済みのチャンネルのみ表示されます。新しいチャンネルに配信する場合は、先にBotを招待してください
               </li>
               <li>
                 難易度やカテゴリを選択しない場合、全ての問題からランダムに出題されます

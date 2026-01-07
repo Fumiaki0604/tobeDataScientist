@@ -77,12 +77,15 @@ export async function GET() {
       }
     } while (cursor && pageCount < maxPages)
 
-    const channels = allChannels.map((channel: any) => ({
-      id: channel.id,
-      name: channel.name,
-      is_private: channel.is_private,
-      is_member: channel.is_member,
-    }))
+    // Botが参加しているチャンネルのみフィルタ
+    const channels = allChannels
+      .filter((channel: any) => channel.is_member)
+      .map((channel: any) => ({
+        id: channel.id,
+        name: channel.name,
+        is_private: channel.is_private,
+        is_member: channel.is_member,
+      }))
 
     return NextResponse.json({ channels })
   } catch (error: any) {
