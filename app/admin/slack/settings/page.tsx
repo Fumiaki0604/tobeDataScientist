@@ -50,6 +50,7 @@ export default function SlackSettingsPage() {
   const [selectedDifficulties, setSelectedDifficulties] = useState<string[]>([])
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   const [isActive, setIsActive] = useState(true)
+  const [channelSearch, setChannelSearch] = useState('')
 
   useEffect(() => {
     checkAdminAccess()
@@ -286,28 +287,43 @@ export default function SlackSettingsPage() {
                     >
                       配信先チャンネル
                     </label>
+                    <input
+                      type="text"
+                      placeholder="チャンネル名で検索..."
+                      value={channelSearch}
+                      onChange={(e) => setChannelSearch(e.target.value)}
+                      className="mt-1 block w-full px-3 py-2 text-base text-gray-900 border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                    />
                     <select
                       id="channel"
                       value={selectedChannel}
                       onChange={(e) => setSelectedChannel(e.target.value)}
-                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base text-gray-900 border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                      className="mt-2 block w-full pl-3 pr-10 py-2 text-base text-gray-900 border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
                       required
+                      size={10}
                     >
                       <option value="" className="text-gray-500">
                         チャンネルを選択...
                       </option>
-                      {channels.map((channel) => (
-                        <option
-                          key={channel.id}
-                          value={channel.id}
-                          className="text-gray-900"
-                        >
-                          {channel.is_private ? '🔒' : '#'} {channel.name}
-                        </option>
-                      ))}
+                      {channels
+                        .filter((channel) =>
+                          channel.name
+                            .toLowerCase()
+                            .includes(channelSearch.toLowerCase())
+                        )
+                        .map((channel) => (
+                          <option
+                            key={channel.id}
+                            value={channel.id}
+                            className="text-gray-900"
+                          >
+                            {channel.is_private ? '🔒' : '#'} {channel.name}
+                          </option>
+                        ))}
                     </select>
                     <p className="mt-2 text-sm text-gray-500">
-                      Botがメッセージを投稿するチャンネルを選択してください
+                      検索して絞り込むか、スクロールして選択してください（最大
+                      {channels.length}件表示中）
                     </p>
                   </div>
 
