@@ -442,7 +442,7 @@ export default function SlackSettingsPage() {
             <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
               <li>配信時刻は日本時間（JST）で設定されます</li>
               <li>
-                Botが参加済みのチャンネルのみ表示されます。新しいチャンネルに配信する場合は、先にBotを招待してください
+                配信前にBotを対象チャンネルに招待してください（プライベートチャンネルの場合は必須）
               </li>
               <li>
                 難易度やカテゴリを選択しない場合、全ての問題からランダムに出題されます
