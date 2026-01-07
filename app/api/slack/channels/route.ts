@@ -54,11 +54,11 @@ export async function GET() {
     const allChannels: any[] = []
     let cursor: string | undefined = undefined
     let pageCount = 0
-    const maxPages = 10 // 最大10ページ（2000チャンネル）まで取得
+    const maxPages = 15 // 最大15ページまで取得（Vercel 10秒タイムアウト対策）
 
     do {
       const result = await slack.conversations.list({
-        exclude_archived: false, // アーカイブ済みも含める
+        exclude_archived: true, // アーカイブ済みは除外に戻す
         types: 'public_channel,private_channel',
         limit: 200,
         cursor,
@@ -73,9 +73,9 @@ export async function GET() {
 
       console.log(`Page ${pageCount}: fetched ${result.channels?.length || 0} channels, cursor: ${cursor ? 'exists' : 'none'}`)
 
-      // 次のページがある場合は1秒待機（レート制限回避）
+      // 次のページがある場合は0.5秒待機（レート制限回避、タイムアウト対策）
       if (cursor && pageCount < maxPages) {
-        await new Promise((resolve) => setTimeout(resolve, 1000))
+        await new Promise((resolve) => setTimeout(resolve, 500))
       }
     } while (cursor && pageCount < maxPages)
 
