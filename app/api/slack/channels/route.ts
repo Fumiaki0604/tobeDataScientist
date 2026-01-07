@@ -58,7 +58,7 @@ export async function GET() {
 
     do {
       const result = await slack.conversations.list({
-        exclude_archived: true,
+        exclude_archived: false, // アーカイブ済みも含める
         types: 'public_channel,private_channel',
         limit: 200,
         cursor,
